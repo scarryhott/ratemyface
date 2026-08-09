@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validClient } from "../../../lib/oauthBridge";
+import { oauthClientValidation, validClient } from "../../../lib/oauthBridge";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
@@ -13,7 +13,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unsupported_response_type" }, { status: 400 });
   }
   if (!validClient(clientId, redirectUri)) {
-    return NextResponse.json({ error: "invalid_client_or_redirect_uri" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "invalid_client_or_redirect_uri",
+        diagnostic: oauthClientValidation(clientId, redirectUri)
+      },
+      { status: 400 }
+    );
   }
 
   const consent = new URL("/oauth/consent", request.nextUrl.origin);
