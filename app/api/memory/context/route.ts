@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { databaseConfigured, db, ensureMemorySchema } from "../../../../lib/db";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
+import { hasEntitlement } from "../../../../lib/stripeBilling";
 
 async function requireUser(request: NextRequest) {
-  const user = await currentOAuthUser(request);
-  if (!user) return null;
-  return user;
+  return currentOAuthUser(request);
+}
+
+function upgradeRequired() {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "upgrade_required",
+      message: "Persistent Rate My Face memory is a premium feature.",
+      required_entitlement: "premium",
+      checkout_action: "createCheckoutSession"
+    },
+    { status: 402 }
+  );
 }
 
 export async function POST(request: NextRequest) {
   const user = await requireUser(request);
   if (!user) return NextResponse.json({ ok: false, error: "oauth_required" }, { status: 401 });
   if (!databaseConfigured()) return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
+  if (!(await hasEntitlement(user.id))) return upgradeRequired();
 
   const body = await request.json().catch(() => ({}));
   const consent = body.consent_personalization === true;
@@ -30,13 +43,14 @@ export async function POST(request: NextRequest) {
     values (${user.id}, ${sql.json(context)}, now())
     on conflict (user_id) do update set context = excluded.context, updated_at = now()
   `;
-  return NextResponse.json({ ok: true, user_id: user.id });
+  return NextResponse.json({ ok: true, saved: true });
 }
 
 export async function GET(request: NextRequest) {
   const user = await requireUser(request);
   if (!user) return NextResponse.json({ ok: false, error: "oauth_required" }, { status: 401 });
   if (!databaseConfigured()) return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
+  if (!(await hasEntitlement(user.id))) return upgradeRequired();
 
   await ensureMemorySchema();
   const sql = db();
