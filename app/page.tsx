@@ -7,6 +7,12 @@ export default function Home() {
       </p>
       <p><strong>As an Amazon Associate I earn from qualifying purchases.</strong></p>
       <div className="card">
+        <h2>Product</h2>
+        <p>
+          Growth dashboard: <a href="/dashboard">/dashboard</a>
+        </p>
+      </div>
+      <div className="card">
         <h2>API status</h2>
         <p>
           Health: <a href="/api/health">/api/health</a>
