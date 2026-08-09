@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-08-09T14:12:00-04:00",
+  "updated_at": "2026-08-09T17:55:00-04:00",
   "summary": {
-    "status": "bootstrap",
+    "status": "billing_bootstrap",
     "goal": "Grow Rate My Face and adjacent products through evidence-based daily review, A/B testing, monetization, and expansion."
   },
   "metrics": {
@@ -15,12 +15,13 @@
   "integrations": {
     "github": "connected",
     "vercel": "git-connected",
-    "custom_gpt_actions": "available",
+    "custom_gpt_actions": "oauth_action_surface_implemented",
     "amazon_creators_api": "not_available",
     "amazon_associates_manual_stats": "needs_connected_source_or_screenshot",
-    "payments": "planned",
-    "accounts": "planned",
-    "database": "planned"
+    "accounts": "rate_my_face_oauth_bridge_implemented",
+    "database": "supabase_postgres_connected_and_memory_schema_implemented",
+    "payments": "stripe_backend_implemented_configuration_pending",
+    "stripe_chatgpt_plugin": "connected_but_no_callable_account-management_tool_exposed_in_this_session"
   },
   "current_experiment": {
     "name": "Action-assisted product verification",
@@ -30,12 +31,18 @@
     "status": "baseline"
   },
   "next_actions": [
-    "Verify production GPT product-link reliability",
-    "Collect ChatGPT GPT usage and Amazon Associates stats from supported sources",
-    "Design OAuth account layer",
-    "Add secure checkout and entitlement flow",
-    "Add persistent history/preferences database",
-    "Research adjacent high-traffic GPT opportunities"
+    "Set STRIPE_SECRET_KEY in Vercel",
+    "Create a recurring Rate My Face Premium Stripe Price and set STRIPE_PRICE_ID_PREMIUM in Vercel",
+    "Register https://ratemyface.vercel.app/api/stripe/webhook in Stripe and set STRIPE_WEBHOOK_SECRET in Vercel",
+    "Verify /api/health reports Stripe secret, price, and webhook configured",
+    "Re-import the updated /api/openapi schema into the Custom GPT",
+    "Test OAuth -> getEntitlements -> createCheckoutSession -> webhook -> premium entitlement end-to-end",
+    "Collect ChatGPT GPT usage and Amazon Associates stats from supported sources"
   ],
-  "daily_reports": []
+  "daily_reports": [
+    {
+      "date": "2026-08-09",
+      "summary": "Implemented Stripe-hosted subscription checkout, billing portal, webhook-driven entitlements, and premium-gated persistent memory. Production activation still requires Stripe secret key, recurring Price ID, and webhook signing secret in Vercel."
+    }
+  ]
 }
