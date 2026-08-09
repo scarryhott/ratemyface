@@ -1,14 +1,21 @@
 import crypto from "crypto";
 import { db } from "./db";
 
-export const OAUTH_CLIENT_ID = process.env.RMF_OAUTH_CLIENT_ID || "ratemyface-chatgpt";
+export const OAUTH_CLIENT_ID = (process.env.RMF_OAUTH_CLIENT_ID || "ratemyface-chatgpt").trim();
 
 export function oauthClientSecret(): string {
-  return process.env.RMF_OAUTH_CLIENT_SECRET || "";
+  return (process.env.RMF_OAUTH_CLIENT_SECRET || "").trim();
+}
+
+export function allowedRedirectUris(): string[] {
+  return (process.env.CHATGPT_OAUTH_REDIRECT_URI || "")
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 export function allowedRedirectUri(): string {
-  return process.env.CHATGPT_OAUTH_REDIRECT_URI || "";
+  return allowedRedirectUris()[0] || "";
 }
 
 let oauthSchemaReady: Promise<void> | null = null;
@@ -43,7 +50,7 @@ export async function ensureOAuthSchema(): Promise<void> {
     `;
     await sql`create index if not exists rmf_oauth_tokens_user_idx on rmf_oauth_tokens(user_id)`;
   })();
-  return oauthSchemaReady;
+  return schemaReady;
 }
 
 export function randomToken(bytes = 32): string {
@@ -51,8 +58,23 @@ export function randomToken(bytes = 32): string {
 }
 
 export function validClient(clientId: string, redirectUri: string): boolean {
-  const allowed = allowedRedirectUri();
-  return Boolean(allowed && clientId === OAUTH_CLIENT_ID && redirectUri === allowed);
+  const redirects = allowedRedirectUris();
+  return Boolean(
+    redirects.length &&
+    clientId.trim() === OAUTH_CLIENT_ID &&
+    redirects.includes(redirectUri.trim())
+  );
+}
+
+export function oauthClientValidation(clientId: string, redirectUri: string) {
+  const redirects = allowedRedirectUris();
+  return {
+    client_id_match: clientId.trim() === OAUTH_CLIENT_ID,
+    redirect_uri_match: redirects.includes(redirectUri.trim()),
+    redirect_uri_configured: redirects.length > 0,
+    received_client_id: clientId,
+    received_redirect_uri: redirectUri
+  };
 }
 
 export function basicClientCredentials(header: string | null): { clientId: string; clientSecret: string } | null {
