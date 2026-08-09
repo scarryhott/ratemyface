@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.2.0",
+      version: "2.2.1",
       description: "OAuth-authenticated Rate My Face Actions. Product recommendation is free; payment infrastructure discovers/creates access; persistent database-backed memory is premium and enforced server-side."
     },
     servers: [{ url: origin }],
@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
           description: "Call this before premium Actions when access is uncertain. This operation is not itself paywalled.",
           responses: {
             "200": { description: "Current plan and active entitlements", content: { "application/json": { schema: { $ref: "#/components/schemas/EntitlementResponse" } } } },
-            "401": { description: "OAuth sign-in required", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+            "401": { description: "OAuth sign-in required", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+            "503": { description: "Database is not configured", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
           }
         }
       },
@@ -40,11 +41,12 @@ export async function GET(request: NextRequest) {
         post: {
           operationId: "createCheckoutSession",
           summary: "PAYMENT-INFRASTRUCTURE — create a Stripe-hosted premium checkout",
-          description: "Create a hosted Stripe Checkout Session for the signed-in Rate My Face account. Never collect card data in chat. Return the checkout_url to the user unchanged.",
+          description: "Create a hosted Stripe Checkout Session for the signed-in Rate My Face account. Never collect card data in chat. Return the checkout_url to the user unchanged. Do not create another subscription if the account is already premium.",
           responses: {
             "200": { description: "Stripe-hosted checkout URL", content: { "application/json": { schema: { $ref: "#/components/schemas/CheckoutResponse" } } } },
+            "409": { description: "Account is already premium; use billing portal instead", content: { "application/json": { schema: { $ref: "#/components/schemas/AlreadyPremiumResponse" } } } },
             "401": { description: "OAuth sign-in required", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
-            "503": { description: "Stripe or premium price is not configured", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+            "503": { description: "Database, Stripe secret, or premium price is not configured", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
           }
         }
       },
@@ -56,7 +58,8 @@ export async function GET(request: NextRequest) {
           responses: {
             "200": { description: "Stripe billing portal URL", content: { "application/json": { schema: { $ref: "#/components/schemas/PortalResponse" } } } },
             "401": { description: "OAuth sign-in required", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
-            "404": { description: "No billing account exists yet", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+            "404": { description: "No billing account exists yet", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+            "503": { description: "Database or Stripe is not configured", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
           }
         }
       },
@@ -87,10 +90,10 @@ export async function GET(request: NextRequest) {
         },
         delete: {
           operationId: "deleteUserContext",
-          summary: "ACCOUNT/SECURITY — delete stored Rate My Face data",
-          description: "Deletes only the identity represented by the current OAuth token. Deletion is never paywalled.",
+          summary: "ACCOUNT/SECURITY — delete stored personalization context/history",
+          description: "Deletes the signed-in user's Rate My Face personalization/history records. This operation is never paywalled. Billing records may be retained separately as required for subscription/account administration.",
           responses: {
-            "200": { description: "Stored user data deleted", content: { "application/json": { schema: { $ref: "#/components/schemas/MutationResponse" } } } },
+            "200": { description: "Stored personalization/history deleted", content: { "application/json": { schema: { $ref: "#/components/schemas/MutationResponse" } } } },
             "401": { description: "OAuth sign-in required", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
             "503": { description: "Database is not configured", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
           }
@@ -107,6 +110,7 @@ export async function GET(request: NextRequest) {
         CheckoutResponse: { type: "object", required: ["ok", "checkout_url", "session_id", "plan"], properties: { ok: { type: "boolean" }, checkout_url: { type: "string", format: "uri" }, session_id: { type: "string" }, plan: { type: "string", enum: ["premium"] } } },
         PortalResponse: { type: "object", required: ["ok", "portal_url"], properties: { ok: { type: "boolean" }, portal_url: { type: "string", format: "uri" } } },
         UpgradeRequiredResponse: { type: "object", required: ["ok", "error", "required_entitlement", "checkout_action"], properties: { ok: { type: "boolean", const: false }, error: { type: "string", const: "upgrade_required" }, message: { type: "string" }, required_entitlement: { type: "string", const: "premium" }, checkout_action: { type: "string", const: "createCheckoutSession" } } },
+        AlreadyPremiumResponse: { type: "object", required: ["ok", "error", "portal_action"], properties: { ok: { type: "boolean", const: false }, error: { type: "string", const: "already_premium" }, message: { type: "string" }, portal_action: { type: "string", const: "createBillingPortalSession" } } },
         MutationResponse: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" }, saved: { type: "boolean" }, deleted: { type: "boolean" } } },
         ErrorResponse: { type: "object", required: ["ok", "error"], properties: { ok: { type: "boolean" }, error: { type: "string" }, message: { type: "string" } } }
       },
