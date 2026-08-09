@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { databaseConfigured } from "../../../lib/db";
-import { stripePriceConfigured, stripeSecretConfigured, stripeWebhookConfigured } from "../../../lib/stripeBilling";
+import {
+  stripeCreditsPriceConfigured,
+  stripePriceConfigured,
+  stripeSecretConfigured,
+  stripeWebhookConfigured
+} from "../../../lib/stripeBilling";
 
 export async function GET() {
   const amazonConfigured = Boolean(
@@ -15,8 +20,14 @@ export async function GET() {
     action_auth_configured: actionAuthConfigured,
     database_configured: databaseConfigured(),
     stripe_secret_configured: stripeSecretConfigured(),
-    stripe_price_configured: stripePriceConfigured(),
+    stripe_credit_price_configured: stripeCreditsPriceConfigured(),
+    stripe_subscription_price_configured: stripePriceConfigured(),
     stripe_webhook_configured: stripeWebhookConfigured(),
+    credit_model: {
+      enabled_in_code: true,
+      credits_per_pack: 100,
+      metered_memory_cost: 1
+    },
     partner_tag: "ratemyface0a-20"
   });
 }
