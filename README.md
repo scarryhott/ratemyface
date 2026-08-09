@@ -4,37 +4,45 @@ Minimal Next.js backend for the Rate My Face Custom GPT.
 
 ## Closure
 
-`GPT image/context -> structured recommendation criteria -> /api/product -> Amazon Creators API -> Amazon-vended affiliate URL -> GPT`
+`GPT image/context -> structured recommendation criteria -> /api/product -> Amazon -> tagged affiliate URL -> GPT`
 
-The backend never invents ASINs or rewrites Amazon affiliate URLs. It returns an Amazon Creators API `detailPageURL` only when the URL contains the Associates tag `ratemyface0a-20`.
+The backend never invents ASINs.
+
+- When Amazon Creators API is configured and returns a valid product, the backend returns Amazon's own vended `detailPageURL` containing `ratemyface0a-20`.
+- When Creators API is unavailable or not yet configured, the backend returns a tagged Amazon search-results link instead of fabricating a product ASIN.
 
 ## Endpoints
 
 - `GET /api/health` — deployment/configuration status without exposing secrets.
-- `POST /api/product` — authenticated product search through Amazon Creators API.
+- `POST /api/product` — authenticated recommendation-link endpoint.
 - `GET /api/openapi` — dynamic OpenAPI 3.1 schema for the Custom GPT Action.
 - `GET /privacy` — public privacy policy for the GPT Action.
 
-## Required Vercel environment variables
+## Required Vercel environment variable
 
-Set these for Production (and Preview if desired):
+Set for Production:
 
-- `AMAZON_CREATORS_CLIENT_ID` — Creators API credential ID.
-- `AMAZON_CREATORS_CLIENT_SECRET` — Creators API credential secret.
 - `GPT_ACTION_SECRET` — a long random value used as the GPT Action bearer API key.
+
+Optional, for exact product resolution through Amazon Creators API:
+
+- `AMAZON_CREATORS_CLIENT_ID`
+- `AMAZON_CREATORS_CLIENT_SECRET`
 
 Do not prefix any secret with `NEXT_PUBLIC_`.
 
 ## Amazon integration
 
-This implementation targets the US marketplace (`www.amazon.com`) and the Associates tag `ratemyface0a-20`.
+This implementation targets the US marketplace (`www.amazon.com`) and Associates tag `ratemyface0a-20`.
 
-It uses:
+With Creators API credentials it uses:
 
 - Login with Amazon OAuth client-credentials token endpoint: `https://api.amazon.com/auth/o2/token`
 - Creators API SearchItems: `https://creatorsapi.amazon/catalog/v1/searchItems`
 
 The access token is cached in-process until shortly before expiration. On serverless cold starts, a new token may be requested.
+
+Without Creators API access, `/api/product` still returns a correctly tagged Amazon search URL and reports `link_type: amazon_search`. The Custom GPT must not claim a specific ASIN in that mode.
 
 ## Custom GPT Action
 
@@ -43,14 +51,11 @@ After deployment:
 1. Open `/api/openapi` on the production deployment and import/copy that schema into the GPT Action configuration.
 2. Configure Action authentication as a Bearer/API key using the same value stored in Vercel as `GPT_ACTION_SECRET`.
 3. Set the GPT privacy-policy URL to `/privacy` on the production deployment.
-4. In GPT instructions, require the model to call `searchProduct`, use only returned product data, and render `affiliate_url` unchanged.
+4. Require the GPT to call `searchProduct` and render `affiliate_url` unchanged.
+5. If `link_type` is `product`, it may use the returned title/ASIN. If `link_type` is `amazon_search`, describe the link only as Amazon results for the recommendation.
 
-## Local development
+## Deployment
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+The repository is structured as a standard Next.js App Router project. If the Vercel project is linked to this GitHub repository, pushes to `main` trigger Vercel deployments automatically.
 
-Then test health at `http://localhost:3000/api/health`.
+A GitHub Actions workflow also runs `npm install` and `npm run build` on pushes and pull requests.
