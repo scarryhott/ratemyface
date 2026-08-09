@@ -5,6 +5,7 @@ export default function Home() {
       <p>
         This site supports the Rate My Face GPT with verified Amazon product recommendations.
       </p>
+      <p><strong>As an Amazon Associate I earn from qualifying purchases.</strong></p>
       <div className="card">
         <h2>API status</h2>
         <p>
