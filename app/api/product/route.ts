@@ -33,6 +33,28 @@ function authorized(request: NextRequest): boolean {
   return request.headers.get("authorization") === `Bearer ${expected}`;
 }
 
+function taggedSearchUrl(keywords: string): string {
+  const url = new URL("https://www.amazon.com/s");
+  url.searchParams.set("k", keywords);
+  url.searchParams.set("tag", PARTNER_TAG);
+  return url.toString();
+}
+
+function fallbackResponse(keywords: string, reason: string) {
+  return NextResponse.json({
+    ok: true,
+    link_type: "amazon_search",
+    asin: null,
+    title: `Amazon results for ${keywords}`,
+    affiliate_url: taggedSearchUrl(keywords),
+    image_url: null,
+    price: null,
+    partner_tag: PARTNER_TAG,
+    marketplace: MARKETPLACE,
+    fallback_reason: reason
+  });
+}
+
 async function getAccessToken(): Promise<string> {
   const now = Date.now();
   if (tokenCache && tokenCache.expiresAt - 60_000 > now) return tokenCache.token;
@@ -78,7 +100,7 @@ export async function POST(request: NextRequest) {
   }
 
   const region = clean(input.region || "US", 16).toUpperCase();
-  if (!['US', 'USA', 'UNITED STATES'].includes(region)) {
+  if (!["US", "USA", "UNITED STATES"].includes(region)) {
     return NextResponse.json(
       { ok: false, error: "unsupported_region", message: "This deployment currently supports the US Amazon Associates store only." },
       { status: 400 }
@@ -92,8 +114,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "product_type_required" }, { status: 400 });
   }
 
-  const keywords = [productType, concern].filter(Boolean).join(" ").slice(0, 180);
+  const keywords = [brand, productType, concern].filter(Boolean).join(" ").slice(0, 180);
   const maxPrice = budgetToCents(input.budget);
+  const amazonConfigured = Boolean(
+    process.env.AMAZON_CREATORS_CLIENT_ID && process.env.AMAZON_CREATORS_CLIENT_SECRET
+  );
+
+  // A tagged Amazon search link is a safe operational fallback: it never invents an ASIN.
+  if (!amazonConfigured) return fallbackResponse(keywords, "creators_api_not_configured");
 
   try {
     const token = await getAccessToken();
@@ -121,10 +149,8 @@ export async function POST(request: NextRequest) {
 
     const data = await amazonResponse.json().catch(() => ({}));
     if (!amazonResponse.ok) {
-      return NextResponse.json(
-        { ok: false, error: "amazon_search_failed", status: amazonResponse.status },
-        { status: 502 }
-      );
+      console.error("Amazon SearchItems failed", amazonResponse.status);
+      return fallbackResponse(keywords, `creators_api_${amazonResponse.status}`);
     }
 
     const items = Array.isArray(data?.searchResult?.items) ? data.searchResult.items : [];
@@ -138,12 +164,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (!item) {
-      return NextResponse.json(
-        { ok: false, error: "no_valid_product", message: "Amazon returned no product with a validated affiliate URL." },
-        { status: 404 }
-      );
-    }
+    if (!item) return fallbackResponse(keywords, "no_vended_product_link");
 
     const title = item?.itemInfo?.title?.displayValue;
     const imageUrl = item?.images?.primary?.medium?.url;
@@ -151,6 +172,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      link_type: "product",
       asin: item.asin,
       title: typeof title === "string" ? title : null,
       affiliate_url: item.detailPageURL,
@@ -161,9 +183,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("product endpoint error", error);
-    return NextResponse.json(
-      { ok: false, error: "service_not_configured", message: error instanceof Error ? error.message : "Unexpected server error." },
-      { status: 503 }
-    );
+    return fallbackResponse(keywords, "creators_api_unavailable");
   }
 }
