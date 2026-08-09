@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentOAuthUser } from "../../../../../lib/supabaseAuth";
-import { billingAccount, stripe, stripeSecretConfigured } from "../../../../../lib/stripeBilling";
+import { currentOAuthUser } from "../../../../lib/supabaseAuth";
+import { billingAccount, stripe, stripeSecretConfigured } from "../../../../lib/stripeBilling";
 
 export const runtime = "nodejs";
 
