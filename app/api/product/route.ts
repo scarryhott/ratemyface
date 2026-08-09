@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { actionOrOAuthAuthorized } from "../../../lib/supabaseAuth";
 
 const PARTNER_TAG = "ratemyface0a-20";
 const MARKETPLACE = "www.amazon.com";
@@ -25,12 +26,6 @@ function budgetToCents(value: unknown): number | undefined {
   const parsed = Number(String(value).replace(/[^0-9.]/g, ""));
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 10000) return undefined;
   return Math.round(parsed * 100);
-}
-
-function authorized(request: NextRequest): boolean {
-  const expected = process.env.GPT_ACTION_SECRET;
-  if (!expected) return false;
-  return request.headers.get("authorization") === `Bearer ${expected}`;
 }
 
 function taggedSearchUrl(keywords: string): string {
@@ -61,9 +56,7 @@ async function getAccessToken(): Promise<string> {
 
   const clientId = process.env.AMAZON_CREATORS_CLIENT_ID;
   const clientSecret = process.env.AMAZON_CREATORS_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    throw new Error("Amazon Creators API credentials are not configured.");
-  }
+  if (!clientId || !clientSecret) throw new Error("Amazon Creators API credentials are not configured.");
 
   const response = await fetch(TOKEN_URL, {
     method: "POST",
@@ -78,9 +71,7 @@ async function getAccessToken(): Promise<string> {
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || typeof data.access_token !== "string") {
-    throw new Error(`Amazon token request failed (${response.status}).`);
-  }
+  if (!response.ok || typeof data.access_token !== "string") throw new Error(`Amazon token request failed (${response.status}).`);
 
   const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 3600;
   tokenCache = { token: data.access_token, expiresAt: now + expiresIn * 1000 };
@@ -88,7 +79,7 @@ async function getAccessToken(): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
-  if (!authorized(request)) {
+  if (!(await actionOrOAuthAuthorized(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
@@ -101,26 +92,17 @@ export async function POST(request: NextRequest) {
 
   const region = clean(input.region || "US", 16).toUpperCase();
   if (!["US", "USA", "UNITED STATES"].includes(region)) {
-    return NextResponse.json(
-      { ok: false, error: "unsupported_region", message: "This deployment currently supports the US Amazon Associates store only." },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: "unsupported_region", message: "This deployment currently supports the US Amazon Associates store only." }, { status: 400 });
   }
 
   const concern = clean(input.concern);
   const productType = clean(input.product_type);
   const brand = clean(input.brand, 80);
-  if (!productType) {
-    return NextResponse.json({ ok: false, error: "product_type_required" }, { status: 400 });
-  }
+  if (!productType) return NextResponse.json({ ok: false, error: "product_type_required" }, { status: 400 });
 
   const keywords = [brand, productType, concern].filter(Boolean).join(" ").slice(0, 180);
   const maxPrice = budgetToCents(input.budget);
-  const amazonConfigured = Boolean(
-    process.env.AMAZON_CREATORS_CLIENT_ID && process.env.AMAZON_CREATORS_CLIENT_SECRET
-  );
-
-  // A tagged Amazon search link is a safe operational fallback: it never invents an ASIN.
+  const amazonConfigured = Boolean(process.env.AMAZON_CREATORS_CLIENT_ID && process.env.AMAZON_CREATORS_CLIENT_SECRET);
   if (!amazonConfigured) return fallbackResponse(keywords, "creators_api_not_configured");
 
   try {
