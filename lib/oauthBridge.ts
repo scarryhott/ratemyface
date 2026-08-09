@@ -50,7 +50,7 @@ export async function ensureOAuthSchema(): Promise<void> {
     `;
     await sql`create index if not exists rmf_oauth_tokens_user_idx on rmf_oauth_tokens(user_id)`;
   })();
-  return schemaReady;
+  return oauthSchemaReady;
 }
 
 export function randomToken(bytes = 32): string {
