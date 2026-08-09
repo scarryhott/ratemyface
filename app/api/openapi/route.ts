@@ -6,16 +6,16 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Product API",
-      version: "1.0.0",
-      description: "Returns one Amazon Creators API-verified product and its Amazon-vended affiliate URL."
+      version: "1.1.0",
+      description: "Returns either an Amazon Creators API-vended product link or a tagged Amazon search link without inventing an ASIN."
     },
     servers: [{ url: origin }],
     paths: {
       "/api/product": {
         post: {
           operationId: "searchProduct",
-          summary: "Find one verified Amazon product",
-          description: "Search Amazon using recommendation criteria. Use only returned product data and return affiliate_url unchanged.",
+          summary: "Get one safe Amazon recommendation link",
+          description: "Search Amazon using recommendation criteria. If link_type is product, use only returned product data and render affiliate_url unchanged. If link_type is amazon_search, do not claim a specific product or ASIN; describe it as Amazon results for the recommendation.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -38,31 +38,30 @@ export async function GET(request: NextRequest) {
           },
           responses: {
             "200": {
-              description: "Verified product",
+              description: "Amazon product or tagged Amazon search link",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
-                    required: ["ok", "asin", "affiliate_url", "partner_tag"],
+                    required: ["ok", "link_type", "affiliate_url", "partner_tag"],
                     properties: {
                       ok: { type: "boolean" },
-                      asin: { type: "string" },
+                      link_type: { type: "string", enum: ["product", "amazon_search"] },
+                      asin: { type: ["string", "null"] },
                       title: { type: ["string", "null"] },
                       affiliate_url: { type: "string", format: "uri" },
                       image_url: { type: ["string", "null"] },
                       price: {},
                       partner_tag: { type: "string" },
-                      marketplace: { type: "string" }
+                      marketplace: { type: "string" },
+                      fallback_reason: { type: "string" }
                     }
                   }
                 }
               }
             },
             "400": { description: "Invalid or unsupported recommendation request" },
-            "401": { description: "Missing or invalid action API key" },
-            "404": { description: "No validated Amazon product found" },
-            "502": { description: "Amazon search request failed" },
-            "503": { description: "Backend is not configured" }
+            "401": { description: "Missing or invalid action API key" }
           }
         }
       }
