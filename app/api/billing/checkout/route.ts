@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { databaseConfigured } from "../../../../lib/db";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 import {
   billingAccount,
+  getEntitlements,
   premiumPriceId,
   saveStripeCustomer,
   stripe,
@@ -15,8 +17,24 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "oauth_required" }, { status: 401 });
   }
+  if (!databaseConfigured()) {
+    return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
+  }
   if (!stripeConfigured()) {
     return NextResponse.json({ ok: false, error: "stripe_not_configured" }, { status: 503 });
+  }
+
+  const entitlements = await getEntitlements(user.id);
+  if (entitlements.premium) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "already_premium",
+        message: "This Rate My Face account already has premium access.",
+        portal_action: "createBillingPortalSession"
+      },
+      { status: 409 }
+    );
   }
 
   const client = stripe();
