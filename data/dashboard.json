@@ -1,0 +1,41 @@
+{
+  "updated_at": "2026-08-09T14:12:00-04:00",
+  "summary": {
+    "status": "bootstrap",
+    "goal": "Grow Rate My Face and adjacent products through evidence-based daily review, A/B testing, monetization, and expansion."
+  },
+  "metrics": {
+    "gpt_uses": null,
+    "amazon_clicks_30d": null,
+    "amazon_commissions_30d": null,
+    "conversion_rate": null,
+    "paid_users": 0,
+    "mrr": 0
+  },
+  "integrations": {
+    "github": "connected",
+    "vercel": "git-connected",
+    "custom_gpt_actions": "available",
+    "amazon_creators_api": "not_available",
+    "amazon_associates_manual_stats": "needs_connected_source_or_screenshot",
+    "payments": "planned",
+    "accounts": "planned",
+    "database": "planned"
+  },
+  "current_experiment": {
+    "name": "Action-assisted product verification",
+    "variant_a": "model-native product research",
+    "variant_b": "model-native research plus Rate My Face Action when useful",
+    "success_metric": "higher valid-link rate without reducing recommendation relevance",
+    "status": "baseline"
+  },
+  "next_actions": [
+    "Verify production GPT product-link reliability",
+    "Collect ChatGPT GPT usage and Amazon Associates stats from supported sources",
+    "Design OAuth account layer",
+    "Add secure checkout and entitlement flow",
+    "Add persistent history/preferences database",
+    "Research adjacent high-traffic GPT opportunities"
+  ],
+  "daily_reports": []
+}
