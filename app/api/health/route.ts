@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { databaseConfigured } from "../../../lib/db";
 
 export async function GET() {
   const amazonConfigured = Boolean(
@@ -11,6 +12,7 @@ export async function GET() {
     service: "ratemyface",
     amazon_configured: amazonConfigured,
     action_auth_configured: actionAuthConfigured,
+    database_configured: databaseConfigured(),
     partner_tag: "ratemyface0a-20"
   });
 }
