@@ -33,8 +33,8 @@ export default function OAuthConsentPage() {
         return;
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
         if (!cancelled) {
           setNeedsLogin(true);
           setStatus("Sign in to approve access for Rate My Face.");
@@ -47,8 +47,15 @@ export default function OAuthConsentPage() {
         if (!cancelled) setStatus(error.message);
         return;
       }
+
+      if (data && !("authorization_id" in data) && "redirect_url" in data) {
+        window.location.assign(data.redirect_url);
+        return;
+      }
+
       if (!cancelled) {
         setDetails(data);
+        setNeedsLogin(false);
         setStatus("Review the requested access below.");
       }
     }
@@ -102,7 +109,7 @@ export default function OAuthConsentPage() {
         </div>
       )}
 
-      {details && (
+      {details && "authorization_id" in details && (
         <div className="card">
           <h2>Allow ChatGPT to access your Rate My Face account?</h2>
           <p>Requested scopes: {details.scope || "profile access"}</p>
