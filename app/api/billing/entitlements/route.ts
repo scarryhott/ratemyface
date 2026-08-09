@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentOAuthUser } from "../../../../../lib/supabaseAuth";
-import { getEntitlements } from "../../../../../lib/stripeBilling";
+import { currentOAuthUser } from "../../../../lib/supabaseAuth";
+import { getEntitlements } from "../../../../lib/stripeBilling";
 
 export const runtime = "nodejs";
 
