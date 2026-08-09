@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { databaseConfigured } from "../../../lib/db";
+import { stripePriceConfigured, stripeSecretConfigured, stripeWebhookConfigured } from "../../../lib/stripeBilling";
 
 export async function GET() {
   const amazonConfigured = Boolean(
@@ -13,6 +14,9 @@ export async function GET() {
     amazon_configured: amazonConfigured,
     action_auth_configured: actionAuthConfigured,
     database_configured: databaseConfigured(),
+    stripe_secret_configured: stripeSecretConfigured(),
+    stripe_price_configured: stripePriceConfigured(),
+    stripe_webhook_configured: stripeWebhookConfigured(),
     partner_tag: "ratemyface0a-20"
   });
 }
