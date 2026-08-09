@@ -2,149 +2,207 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
+
   const schema = {
-    openapi: "3.1.0",
+    openapi: "3.0.1",
     info: {
       title: "Rate My Face Actions API",
-      version: "1.2.0",
-      description: "Product recommendation plus consent-based Rate My Face application memory. Product links are backend-verified; persistent context is stored only after explicit personalization consent."
+      version: "1.3.0",
+      description:
+        "Rate My Face product recommendation and consent-based application memory. Product data must come from this API when an action result is used; persistent context must only be saved after explicit user consent."
     },
     servers: [{ url: origin }],
     paths: {
       "/api/product": {
         post: {
           operationId: "searchProduct",
-          summary: "Get one safe Amazon recommendation link",
-          description: "Search Amazon using recommendation criteria. If link_type is product, use only returned product data and render affiliate_url unchanged. If link_type is amazon_search, do not claim a specific product or ASIN; describe it as Amazon results for the recommendation.",
+          summary: "Find one Amazon recommendation",
+          description:
+            "Find one relevant Amazon result from product criteria. If link_type=product, treat the returned ASIN/title/affiliate_url as authoritative. If link_type=amazon_search, describe it only as Amazon search results and do not invent a specific product.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["product_type"],
-                  properties: {
-                    concern: { type: "string", description: "Short aesthetic or practical concern relevant to the product." },
-                    product_type: { type: "string", description: "Specific product type to search for." },
-                    brand: { type: "string", description: "Optional preferred brand." },
-                    budget: { oneOf: [{ type: "number" }, { type: "string" }], description: "Optional maximum budget in US dollars." },
-                    region: { type: "string", enum: ["US"], description: "Amazon marketplace region." }
-                  }
-                }
+                schema: { $ref: "#/components/schemas/ProductRequest" }
               }
             }
           },
           responses: {
             "200": {
-              description: "Amazon product or tagged Amazon search link",
+              description: "Verified Amazon product or tagged Amazon search fallback",
               content: {
                 "application/json": {
-                  schema: {
-                    type: "object",
-                    required: ["ok", "link_type", "affiliate_url", "partner_tag"],
-                    properties: {
-                      ok: { type: "boolean" },
-                      link_type: { type: "string", enum: ["product", "amazon_search"] },
-                      asin: { type: ["string", "null"] },
-                      title: { type: ["string", "null"] },
-                      affiliate_url: { type: "string", format: "uri" },
-                      image_url: { type: ["string", "null"] },
-                      price: {},
-                      partner_tag: { type: "string" },
-                      marketplace: { type: "string" },
-                      fallback_reason: { type: "string" }
-                    }
-                  }
+                  schema: { $ref: "#/components/schemas/ProductResponse" }
                 }
               }
             },
-            "400": { description: "Invalid or unsupported recommendation request" },
-            "401": { description: "Missing or invalid action API key" }
+            "400": {
+              description: "Invalid product request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "401": {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
           }
         }
       },
       "/api/memory/context": {
         get: {
           operationId: "getUserContext",
-          summary: "Retrieve saved Rate My Face context",
-          description: "Retrieve the user's previously stored Rate My Face personalization context. Use only for a user identifier associated with the current user. Do not infer consent from the existence of this endpoint.",
+          summary: "Get saved Rate My Face context",
+          description:
+            "Retrieve saved personalization context for the supplied Rate My Face application user identifier.",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "user_id",
               in: "query",
               required: true,
-              schema: { type: "string", maxLength: 128 },
-              description: "Rate My Face application user identifier."
+              description: "Rate My Face application user identifier for the current user.",
+              schema: { type: "string", minLength: 1, maxLength: 128 }
             }
           ],
           responses: {
-            "200": { description: "Saved context or found=false" },
-            "400": { description: "Missing user identifier" },
-            "401": { description: "Missing or invalid action API key" },
-            "503": { description: "Database is not configured" }
+            "200": {
+              description: "Saved context result",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ContextGetResponse" }
+                }
+              }
+            },
+            "400": {
+              description: "Missing user identifier",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "401": {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "503": {
+              description: "Database unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
           }
         },
         post: {
           operationId: "saveUserContext",
-          summary: "Save consented Rate My Face personalization context",
-          description: "Persist a compact structured summary of useful Rate My Face preferences/context only when the current user explicitly consents to persistent personalization. Do not send unnecessary full transcripts, passwords, authentication tokens, payment data, or other secrets.",
+          summary: "Save consented personalization context",
+          description:
+            "Save a compact structured personalization summary only after the user explicitly agrees to persistent Rate My Face memory. Never send passwords, authentication tokens, payment information, or unnecessary full transcripts.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["user_id", "consent_personalization", "context"],
-                  properties: {
-                    user_id: { type: "string", maxLength: 128, description: "Rate My Face application user identifier." },
-                    consent_personalization: { type: "boolean", enum: [true], description: "Must be true only after explicit user consent to persistent personalization." },
-                    context: {
-                      type: "object",
-                      additionalProperties: true,
-                      description: "Compact structured context such as style preferences, product interests, budget, brands, prior choices, and artistic narrative."
-                    }
-                  }
-                }
+                schema: { $ref: "#/components/schemas/ContextSaveRequest" }
               }
             }
           },
           responses: {
-            "200": { description: "Context saved" },
-            "400": { description: "Missing user identifier or consent" },
-            "401": { description: "Missing or invalid action API key" },
-            "503": { description: "Database is not configured" }
+            "200": {
+              description: "Context saved",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ContextMutationResponse" }
+                }
+              }
+            },
+            "400": {
+              description: "Missing user identifier or explicit consent",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "401": {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "503": {
+              description: "Database unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
           }
         },
         delete: {
           operationId: "deleteUserContext",
-          summary: "Delete Rate My Face stored user data",
-          description: "Delete the Rate My Face application memory associated with the supplied current-user identifier when the user requests deletion.",
+          summary: "Delete saved Rate My Face data",
+          description:
+            "Delete stored Rate My Face memory for the supplied current-user identifier when the user asks to delete it.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["user_id"],
-                  properties: {
-                    user_id: { type: "string", maxLength: 128, description: "Rate My Face application user identifier." }
-                  }
-                }
+                schema: { $ref: "#/components/schemas/ContextDeleteRequest" }
               }
             }
           },
           responses: {
-            "200": { description: "Stored Rate My Face user data deleted" },
-            "400": { description: "Missing user identifier" },
-            "401": { description: "Missing or invalid action API key" },
-            "503": { description: "Database is not configured" }
+            "200": {
+              description: "Stored user data deleted",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ContextDeleteResponse" }
+                }
+              }
+            },
+            "400": {
+              description: "Missing user identifier",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "401": {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            },
+            "503": {
+              description: "Database unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" }
+                }
+              }
+            }
           }
         }
       }
@@ -155,11 +213,138 @@ export async function GET(request: NextRequest) {
           type: "http",
           scheme: "bearer"
         }
+      },
+      schemas: {
+        ProductRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["product_type"],
+          properties: {
+            concern: {
+              type: "string",
+              maxLength: 120,
+              description: "Short appearance, grooming, style, skincare, accessory, or practical concern."
+            },
+            product_type: {
+              type: "string",
+              minLength: 1,
+              maxLength: 120,
+              description: "Specific product type to find, such as beard trimmer, moisturizer, sunglasses, or hair clay."
+            },
+            brand: {
+              type: "string",
+              maxLength: 80,
+              description: "Optional preferred brand."
+            },
+            budget: {
+              type: "string",
+              maxLength: 40,
+              description: "Optional maximum budget in US dollars, for example '40' or 'under $40'."
+            },
+            region: {
+              type: "string",
+              enum: ["US"],
+              default: "US",
+              description: "Amazon marketplace region."
+            }
+          }
+        },
+        ProductResponse: {
+          type: "object",
+          required: ["ok", "link_type", "affiliate_url", "partner_tag"],
+          properties: {
+            ok: { type: "boolean" },
+            link_type: { type: "string", enum: ["product", "amazon_search"] },
+            asin: { type: "string", nullable: true },
+            title: { type: "string", nullable: true },
+            affiliate_url: { type: "string", format: "uri" },
+            image_url: { type: "string", format: "uri", nullable: true },
+            price: { type: "string", nullable: true },
+            partner_tag: { type: "string", enum: ["ratemyface0a-20"] },
+            marketplace: { type: "string" },
+            fallback_reason: { type: "string", nullable: true }
+          }
+        },
+        ContextSaveRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["user_id", "consent_personalization", "context"],
+          properties: {
+            user_id: {
+              type: "string",
+              minLength: 1,
+              maxLength: 128,
+              description: "Rate My Face application user identifier for the current user."
+            },
+            consent_personalization: {
+              type: "boolean",
+              description: "Must be true only after the current user explicitly consents to persistent personalization."
+            },
+            context: {
+              type: "object",
+              additionalProperties: true,
+              description: "Compact structured context: preferences, budget, brands, prior products, style themes, and artistic narrative."
+            }
+          }
+        },
+        ContextDeleteRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["user_id"],
+          properties: {
+            user_id: {
+              type: "string",
+              minLength: 1,
+              maxLength: 128
+            }
+          }
+        },
+        ContextGetResponse: {
+          type: "object",
+          required: ["ok", "found", "user_id"],
+          properties: {
+            ok: { type: "boolean" },
+            found: { type: "boolean" },
+            user_id: { type: "string" },
+            consent_personalization: { type: "boolean", nullable: true },
+            consent_history: { type: "boolean", nullable: true },
+            context: { type: "object", nullable: true, additionalProperties: true },
+            updated_at: { type: "string", nullable: true }
+          }
+        },
+        ContextMutationResponse: {
+          type: "object",
+          required: ["ok", "user_id"],
+          properties: {
+            ok: { type: "boolean" },
+            user_id: { type: "string" }
+          }
+        },
+        ContextDeleteResponse: {
+          type: "object",
+          required: ["ok", "deleted", "user_id"],
+          properties: {
+            ok: { type: "boolean" },
+            deleted: { type: "boolean" },
+            user_id: { type: "string" }
+          }
+        },
+        ErrorResponse: {
+          type: "object",
+          required: ["ok", "error"],
+          properties: {
+            ok: { type: "boolean" },
+            error: { type: "string" },
+            message: { type: "string", nullable: true }
+          }
+        }
       }
     }
   };
 
   return NextResponse.json(schema, {
-    headers: { "Cache-Control": "public, max-age=300" }
+    headers: {
+      "Cache-Control": "no-store"
+    }
   });
 }
