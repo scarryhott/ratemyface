@@ -30,7 +30,18 @@ export default function OperatorLoginPage() {
   async function google(){await run(async()=>{const supabase=browserClient();const redirectTo=`${window.location.origin}/auth/complete?next=/operator`;const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo}});if(error)throw error;});}
   async function sendOtp(){await run(async()=>{if(!phone.trim())throw new Error("Enter your owner phone number in international format, for example +1…");const supabase=browserClient();const {error}=await supabase.auth.signInWithOtp({phone:phone.trim()});if(error)throw error;setOtpSent(true);setMessage("OTP sent. Enter the code from your phone.");});}
   async function verifyOtp(){await run(async()=>{const supabase=browserClient();const {data,error}=await supabase.auth.verifyOtp({phone:phone.trim(),token:otp.trim(),type:"sms"});if(error)throw error;if(!data.session?.access_token)throw new Error("Phone verification did not return a session.");await bridge(data.session.access_token);});}
-  async function web3(chain:"ethereum"|"solana"){await run(async()=>{const supabase=browserClient();const {data,error}=await supabase.auth.signInWithWeb3({chain,statement:"Authenticate as the owner of the Rate My Face Builder Operator. No transaction is requested."});if(error)throw error;if(!data.session?.access_token)throw new Error("Wallet signature did not return a session.");await bridge(data.session.access_token);});}
+  async function web3(chain:"ethereum"|"solana"){
+    await run(async()=>{
+      const supabase=browserClient();
+      const statement="Authenticate as the owner of the Rate My Face Builder Operator. No transaction is requested.";
+      const response = chain === "ethereum"
+        ? await supabase.auth.signInWithWeb3({chain:"ethereum",statement})
+        : await supabase.auth.signInWithWeb3({chain:"solana",statement});
+      if(response.error)throw response.error;
+      if(!response.data.session?.access_token)throw new Error("Wallet signature did not return a session.");
+      await bridge(response.data.session.access_token);
+    });
+  }
 
   useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.get("provider")==="google")void google();/* one-shot */},[]);
 
