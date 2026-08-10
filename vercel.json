@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "outputDirectory": ".next",
+  "env": {
+    "RMF_BROWSER_CONTROL_URL": "https://browser-runtime-production-307b.up.railway.app"
+  },
   "crons": [
     { "path": "/api/operator/heartbeat", "schedule": "0 14 * * *" }
   ]
