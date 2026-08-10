@@ -1,0 +1,4 @@
+import { NextRequest,NextResponse } from 'next/server';import { db } from '../../../../lib/db';import { ensureOperatorSchema } from '../../../../lib/operatorAgent';
+export const runtime='nodejs';
+function ok(r:NextRequest){const s=process.env.RMF_OPERATOR_SIGNAL_SECRET;return Boolean(s)&&r.headers.get('authorization')===`Bearer ${s}`;}
+export async function GET(r:NextRequest){if(!ok(r))return NextResponse.json({ok:false,error:'unauthorized'},{status:401});await ensureOperatorSchema();const sql=db();const [signals,runs,approvals,ledger]=await Promise.all([sql`select * from rmf_agent_signals order by created_at desc limit 20`,sql`select * from rmf_agent_runs order by created_at desc limit 20`,sql`select * from rmf_agent_approvals where status='pending' order by created_at desc limit 20`,sql`select * from rmf_agent_ledger order by created_at desc limit 50`]);return NextResponse.json({ok:true,signals,runs,approvals,ledger});}
