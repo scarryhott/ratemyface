@@ -93,6 +93,7 @@ export default function OperatorPage() {
             <p><strong>Method:</strong> {owner.method}</p>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={refresh} disabled={loading} style={buttonStyle}>Inspect agent</button>
+              <a href="/operator/access" style={buttonLinkStyle}>Account sign-in access</a>
               <button onClick={signOut} disabled={loading} style={secondaryButtonStyle}>Sign out</button>
             </div>
           </>
@@ -123,3 +124,4 @@ export default function OperatorPage() {
 
 const buttonStyle:React.CSSProperties={marginTop:12,padding:"10px 14px",border:"1px solid #111",borderRadius:8,background:"#111",color:"white",cursor:"pointer"};
 const secondaryButtonStyle:React.CSSProperties={...buttonStyle,background:"white",color:"#111"};
+const buttonLinkStyle:React.CSSProperties={...buttonStyle,display:"inline-block",textDecoration:"none"};
