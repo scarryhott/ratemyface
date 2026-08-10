@@ -1,0 +1,3 @@
+import { NextRequest,NextResponse } from 'next/server';import { enqueueSignal,runOneSignal } from '../../../../lib/operatorAgent';
+export const runtime='nodejs';export const maxDuration=60;
+export async function GET(r:NextRequest){const cron=process.env.CRON_SECRET;if(!cron||r.headers.get('authorization')!==`Bearer ${cron}`)return NextResponse.json({ok:false,error:'unauthorized'},{status:401});await enqueueSignal('vercel-cron','heartbeat',{goal:'Review current project context, identify the highest-value admissible next step, and request approval rather than exceeding authority.'},1);try{return NextResponse.json({ok:true,heartbeat:true,run:await runOneSignal()});}catch(e:any){return NextResponse.json({ok:false,error:String(e?.message||e)},{status:500});}}
