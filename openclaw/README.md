@@ -1,39 +1,11 @@
-# Rate My Face OpenClaw Operator
+# OpenClaw Design Reference
 
-This directory defines the integration boundary for a persistent OpenClaw operator around the existing Rate My Face stack.
+This directory is retained as an architectural reference from the first operator design pass. OpenClaw is **not** the active Rate My Face operator runtime.
 
-Upstream: https://github.com/openclaw/openclaw
+The active implementation is the closure-native builder harness documented in [`operator/HARNESS.md`](../operator/HARNESS.md), running on the existing Vercel + Supabase/Postgres stack.
 
-## Why separate runtime
-OpenClaw is an always-on Gateway/agent runtime and expects a daemon-capable host. Rate My Face remains the Vercel serverless web/API surface. Do not embed the long-running OpenClaw Gateway inside a normal Vercel Function.
+Useful concepts retained from the OpenClaw design are typed tools, persistent sessions/state, bounded permissions, skills, heartbeats, and explicit execution receipts. Those concepts are implemented independently rather than by embedding or hosting the OpenClaw daemon.
 
-Deploy OpenClaw on an always-on Linux host/container/VM, then let it operate Rate My Face through bounded tools and provider APIs.
+The user-facing Rate My Face Custom GPT remains separate from the operator. The operator exists above the GPT fleet to build, test, deploy, measure, and improve GPT products.
 
-## Context
-The operator should read, in order:
-1. `DAILY_GROWTH_AGENT_CONTEXT.md`
-2. `GPT_INSTRUCTIONS.md`
-3. `STRIPE_BILLING_CONTEXT.md`
-4. `EXPERIMENT_LOG.md`
-5. `data/dashboard.json`
-6. this directory's `AGENTS.md`, `SOUL.md`, and `TOOLS.md`
-
-## Initial authority
-Start read-heavy and reversible:
-- GitHub repository read; branch/PR writes only.
-- Vercel deployment/status/log reads; preview deployment before production.
-- Stripe aggregate/business reads; no price/refund/payment mutations without approval.
-- Supabase aggregate/operational access; no unrestricted user export.
-- public-web competitor research.
-- email/signal inbox and heartbeat.
-
-Credentials are capabilities, not context. Keep secrets in the host/provider secret store, never workspace Markdown, GitHub commits, prompts, or logs.
-
-## Runtime closure
-`signal/heartbeat -> gather context -> propose -> policy gate -> act -> verify -> ledger -> notify -> next heartbeat`
-
-## Deployment target
-OpenClaw currently documents Node 24.15+ as recommended and supports daemon installation through `openclaw onboard --install-daemon`. Use the stable release channel first. Pin a tested version before granting production authority.
-
-## Vercel relationship
-The existing `ratemyface.vercel.app` app stays the user/API plane. OpenClaw is the operator/control plane. It can call the Rate My Face API, inspect deployments and create tested GitHub changes, but should not become a serverless request handler itself.
+Do not add OpenClaw credentials or daemon configuration unless a later experiment explicitly chooses to compare the native closure harness against an OpenClaw runtime.
