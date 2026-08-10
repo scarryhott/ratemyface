@@ -180,6 +180,20 @@ export async function enqueueSignal(
 export async function nextSignal() {
   await ensureOperatorSchema();
   const sql = db();
+
+  // A Vercel function can be terminated by the platform before our catch block runs.
+  // Recover only runs that have exceeded the route's execution window by a wide margin.
+  await sql`
+    update rmf_agent_runs
+    set status='failed',closure_state='stale_timeout',error=coalesce(error,'stale_run_recovered_after_timeout'),completed_at=now()
+    where status='running' and created_at < now() - interval '2 minutes'
+  `;
+  await sql`
+    update rmf_agent_signals
+    set status='queued',started_at=null
+    where status='running' and started_at < now() - interval '2 minutes'
+  `;
+
   const result = await sql`
     update rmf_agent_signals
     set status='running',started_at=now()
@@ -266,36 +280,59 @@ function fallbackProbePlan(): OperatorModelPlan {
   });
 }
 
+function fallbackAnalysisPlan(reason: string): OperatorModelPlan {
+  return normalizeModelPlan({
+    summary: "Planner unavailable within the bounded run window; the harness halted safely without executing tools.",
+    observations: [reason],
+    candidates: [],
+    required_authority: 1,
+    requires_human_approval: false,
+    verification: ["Confirm that no mutating tool was selected or executed."]
+  });
+}
+
 export async function gatewayPlan(input: unknown) {
   const key = process.env.AI_GATEWAY_API_KEY;
   if (!key) throw new Error("AI_GATEWAY_API_KEY_not_configured");
   const model = process.env.RMF_OPERATOR_MODEL || "openai/gpt-5.6-terra";
   const registry = getOperatorToolRegistry();
-  const response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "X-Vercel-AI-App-Name": "Rate My Face Operator"
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are the planning component inside the Rate My Face closure-native builder harness. You do not directly execute tools. Return JSON only with keys summary, observations, candidates, required_authority, requires_human_approval, verification. candidates must be an array of objects with id, tool, authority, intent, reason, expected_return, reversible, invariants, args. Use only tools present in the supplied registry. Prefer the lowest authority and reversible actions. Never request, reveal, place in a prompt, or write credentials. L0=observe, L1=analyze, L2=isolated branch/sandbox, L3=preview, L4=bounded production, L5=economic spend, L6=strategic/permission expansion. Never claim an action executed; execution and verification are performed by the harness after your plan."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ input, tool_registry: registry })
-        }
-      ]
-    }),
-    cache: "no-store"
-  });
+  const timeoutMs = Math.max(3000, Math.min(45000, Number(process.env.RMF_OPERATOR_GATEWAY_TIMEOUT_MS || 15000)));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "X-Vercel-AI-App-Name": "Rate My Face Operator"
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are the planning component inside the Rate My Face closure-native builder harness. You do not directly execute tools. Return JSON only with keys summary, observations, candidates, required_authority, requires_human_approval, verification. candidates must be an array of objects with id, tool, authority, intent, reason, expected_return, reversible, invariants, args. Use only tools present in the supplied registry. Prefer the lowest authority and reversible actions. Never request, reveal, place in a prompt, or write credentials. L0=observe, L1=analyze, L2=isolated branch/sandbox, L3=preview, L4=bounded production, L5=economic spend, L6=strategic/permission expansion. Never claim an action executed; execution and verification are performed by the harness after your plan."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({ input, tool_registry: registry })
+          }
+        ]
+      }),
+      cache: "no-store",
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`AI_GATEWAY_timeout_after_${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     throw new Error(`AI_GATEWAY_${response.status}:${(await response.text()).slice(0, 500)}`);
   }
@@ -356,12 +393,16 @@ export async function runOneSignal() {
         project: context
       });
     } catch (error) {
-      if (String(signal.kind) !== "control_probe") throw error;
-      ai = { model: "deterministic-closure-taskset", plan: fallbackProbePlan(), usage: null };
+      const reason = errorMessage(error);
+      if (String(signal.kind) === "control_probe") {
+        ai = { model: "deterministic-closure-taskset", plan: fallbackProbePlan(), usage: null };
+      } else {
+        ai = { model: "safe-planner-fallback", plan: fallbackAnalysisPlan(reason), usage: null };
+      }
       await ledger(runId, "planner_fallback", admittedAuthority, {
-        reason: errorMessage(error),
-        fallback: "deterministic_control_probe"
-      }, "control_probe");
+        reason,
+        fallback: String(signal.kind) === "control_probe" ? "deterministic_control_probe" : "safe_halt"
+      }, String(signal.kind) === "control_probe" ? "control_probe" : "project_context_read", false);
     }
 
     const closure = resolveClosure(signal, ai.plan, admittedAuthority);
