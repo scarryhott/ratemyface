@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "../../../../lib/db";
 import { ensureOperatorSchema } from "../../../../lib/operatorAgent";
 import { getOperatorToolRegistry, projectContextRead } from "../../../../lib/operatorTools";
+import { operatorRequestAuthorized } from "../../../../lib/operatorOwnerAuth";
 
 export const runtime = "nodejs";
 
-function authorized(request: NextRequest) {
-  const secret = process.env.RMF_OPERATOR_SIGNAL_SECRET;
-  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(request: NextRequest) {
-  if (!authorized(request)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await operatorRequestAuthorized(request);
+  if (!auth.ok) return NextResponse.json({ ok:false, error:"unauthorized" }, { status:401 });
 
   await ensureOperatorSchema();
   const sql = db();
@@ -29,21 +24,10 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    ok: true,
-    harness: {
-      version: "closure-native-v1",
-      max_authority: Number(process.env.RMF_OPERATOR_MAX_AUTHORITY || 1),
-      model: process.env.RMF_OPERATOR_MODEL || "openai/gpt-5.6-terra",
-      ai_gateway_configured: Boolean(process.env.AI_GATEWAY_API_KEY),
-      tools: getOperatorToolRegistry(),
-      runtime: runtimeContext
-    },
-    projects,
-    gpts,
-    signals,
-    runs,
-    approvals,
-    receipts,
-    ledger
+    ok:true,
+    actor:auth.actor,
+    owner:auth.owner || null,
+    harness:{version:"closure-native-v1",max_authority:Number(process.env.RMF_OPERATOR_MAX_AUTHORITY||1),model:process.env.RMF_OPERATOR_MODEL||"openai/gpt-5.6-terra",ai_gateway_configured:Boolean(process.env.AI_GATEWAY_API_KEY),tools:getOperatorToolRegistry(),runtime:runtimeContext},
+    projects,gpts,signals,runs,approvals,receipts,ledger
   });
 }
