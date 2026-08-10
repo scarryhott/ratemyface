@@ -1,48 +1,69 @@
 {
-  "updated_at": "2026-08-09T17:55:00-04:00",
+  "updated_at": "2026-08-10T08:31:00-04:00",
   "summary": {
-    "status": "billing_bootstrap",
-    "goal": "Grow Rate My Face and adjacent products through evidence-based daily review, A/B testing, monetization, and expansion."
+    "status": "persistent_personal_network_deployed_activation_pending",
+    "goal": "Differentiate Rate My Face from default ChatGPT through authenticated cross-session state, feedback, transactions, and future provider integrations while preserving a useful free experience."
   },
   "metrics": {
     "gpt_uses": null,
     "amazon_clicks_30d": null,
     "amazon_commissions_30d": null,
     "conversion_rate": null,
-    "paid_users": 0,
-    "mrr": 0
+    "seven_day_return_rate": null,
+    "paid_users": null,
+    "credit_purchases": null,
+    "mrr": null
   },
   "integrations": {
     "github": "connected",
-    "vercel": "git-connected",
-    "custom_gpt_actions": "oauth_action_surface_implemented",
+    "vercel": "latest_personal_network_commit_deployment_success_via_github_status",
+    "vercel_runtime_health": "not_rechecked_connector_unavailable_during_daily_run",
+    "custom_gpt_actions": "openapi_v2_4_0_deployed_reimport_required",
     "amazon_creators_api": "not_available",
     "amazon_associates_manual_stats": "needs_connected_source_or_screenshot",
+    "chatgpt_gpt_usage_stats": "needs_supported_source_or_screenshot",
     "accounts": "rate_my_face_oauth_bridge_implemented",
-    "database": "supabase_postgres_connected_and_memory_schema_implemented",
-    "payments": "stripe_backend_implemented_configuration_pending",
-    "stripe_chatgpt_plugin": "connected_but_no_callable_account-management_tool_exposed_in_this_session"
+    "database": "supabase_postgres_personal_profile_history_recommendations_credit_ledger_implemented",
+    "payments": "stripe_credit_backend_and_webhook_code_deployed_end_to_end_payment_not_yet_verified",
+    "social_provider_connections": "schema_ready_no_provider_oauth_connected"
+  },
+  "action_classification": {
+    "searchProduct": "FREE",
+    "getEntitlements": "PAYMENT-INFRASTRUCTURE",
+    "createCreditCheckoutSession": "PAYMENT-INFRASTRUCTURE",
+    "getPersonalNetwork": "PAID",
+    "updatePersonalNetwork": "PAID",
+    "getUserContext": "PAID",
+    "saveUserContext": "PAID",
+    "deleteUserContext": "ACCOUNT/SECURITY"
   },
   "current_experiment": {
-    "name": "Action-assisted product verification",
-    "variant_a": "model-native product research",
-    "variant_b": "model-native research plus Rate My Face Action when useful",
-    "success_metric": "higher valid-link rate without reducing recommendation relevance",
-    "status": "baseline"
+    "name": "Persistent personal network retention",
+    "variant_a": "session-only appearance/product recommendation",
+    "variant_b": "free core plus optional paid cross-session profile, history, saved recommendations and feedback",
+    "success_metric": "higher 7-day return rate among exposed authenticated users; secondary paid Action adoption and feedback rate",
+    "status": "pending_telemetry_and_manual_gpt_test"
+  },
+  "research": {
+    "competitor_pattern": "Public appearance/lookalike products emphasize instant results and sharing; adjacent style products increasingly add persistent history, personalized style profiles, closets/avatars, and social loops.",
+    "expansion_opportunity": "A separate celebrity-style inspiration surface focused on opt-in style goals, saved looks and product pathways rather than identity claims; persistent Rate My Face profile can be the shared account layer."
   },
   "next_actions": [
-    "Set STRIPE_SECRET_KEY in Vercel",
-    "Create a recurring Rate My Face Premium Stripe Price and set STRIPE_PRICE_ID_PREMIUM in Vercel",
-    "Register https://ratemyface.vercel.app/api/stripe/webhook in Stripe and set STRIPE_WEBHOOK_SECRET in Vercel",
-    "Verify /api/health reports Stripe secret, price, and webhook configured",
-    "Re-import the updated /api/openapi schema into the Custom GPT",
-    "Test OAuth -> getEntitlements -> createCheckoutSession -> webhook -> premium entitlement end-to-end",
-    "Collect ChatGPT GPT usage and Amazon Associates stats from supported sources"
+    "Re-import https://ratemyface.vercel.app/api/openapi into the Custom GPT; changed operations are getPersonalNetwork (PAID) and updatePersonalNetwork (PAID)",
+    "Run a manual authenticated GPT transcript covering getEntitlements -> credit checkout -> verified credit balance -> getPersonalNetwork/updatePersonalNetwork because Scheduled Tasks cannot execute the Custom GPT",
+    "Verify STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are present in Vercel and complete one Stripe test Checkout/webhook/credit grant before claiming payment integration healthy",
+    "Add first-party Action telemetry for calls, 402 responses, credit conversion and returning authenticated users before interpreting retention",
+    "Provide ChatGPT GPT usage screenshot/export and Amazon Associates report or official supported integration; these metrics are currently inaccessible",
+    "Evaluate one social provider OAuth integration only after explicit permission expansion approval"
   ],
   "daily_reports": [
     {
       "date": "2026-08-09",
-      "summary": "Implemented Stripe-hosted subscription checkout, billing portal, webhook-driven entitlements, and premium-gated persistent memory. Production activation still requires Stripe secret key, recurring Price ID, and webhook signing secret in Vercel."
+      "summary": "Implemented Stripe-hosted subscription checkout, billing portal, webhook-driven entitlements, and premium-gated persistent memory. Production activation still requires Stripe configuration verification."
+    },
+    {
+      "date": "2026-08-10",
+      "summary": "Verified the personal-network OpenAPI commit deployed successfully through GitHub/Vercel status. Rate My Face now has server-backed cross-session profile, history, saved recommendations and feedback as PAID Actions. Public competitor research supports persistence/social sharing as differentiation, but Rate My Face retention, GPT usage, Associates conversion and end-to-end Stripe credit metrics remain unmeasured. OpenAPI v2.4.0 must be re-imported and a manual authenticated GPT/payment test is required."
     }
   ]
 }
