@@ -137,7 +137,7 @@ function evaluate(candidate: OperatorCandidate, admittedAuthority: Authority): C
   const reasons: string[] = [];
 
   if (!spec) reasons.push("unknown_tool");
-  const required = spec ? Math.max(spec.authority, candidate.authority) as Authority : candidate.authority;
+  const required = spec ? (Math.max(spec.authority, candidate.authority) as Authority) : candidate.authority;
   const configured = Boolean(runtime?.configured);
   if (!configured) reasons.push("tool_not_configured");
 
@@ -147,9 +147,7 @@ function evaluate(candidate: OperatorCandidate, admittedAuthority: Authority): C
   const reversible = !spec?.mutating || (spec.reversible && candidate.reversible);
   if (!reversible) reasons.push("mutation_not_reversible");
 
-  const verifiable =
-    candidate.expected_return.trim().length > 0 &&
-    candidate.invariants.length > 0;
+  const verifiable = candidate.expected_return.trim().length > 0 && candidate.invariants.length > 0;
   if (!verifiable) reasons.push("missing_expected_return_or_invariants");
 
   return {
@@ -179,7 +177,12 @@ export function resolveClosure(
   if (selectedEvaluation) {
     const selected = selectedEvaluation.candidate;
     const explicitControlProbe = String(signal?.kind || "") === "control_probe";
-    const approvalRequested = plan.requires_human_approval && !explicitControlProbe;
+    const payload = record(signal?.payload);
+    const ownerApprovedAuthority = authority(payload.owner_approved_authority, 0);
+    const auditedApprovalSatisfied = Boolean(payload.owner_approved) && ownerApprovedAuthority >= selected.authority;
+    const approvalRequested =
+      plan.requires_human_approval && !explicitControlProbe && !auditedApprovalSatisfied;
+
     if (approvalRequested) {
       return {
         harness: "closure-native-v1",
@@ -188,7 +191,7 @@ export function resolveClosure(
         evaluations,
         required_authority: selected.authority,
         reason: "model_requested_human_approval",
-        self_limit: "No tool is executed until the pending approval is resolved."
+        self_limit: "No tool is executed until an authenticated approval is recorded and the task is re-queued."
       };
     }
 
@@ -198,7 +201,11 @@ export function resolveClosure(
       selected,
       evaluations,
       required_authority: selected.authority,
-      reason: deterministic ? "deterministic_control_probe_closed" : "first_admissible_candidate_closed",
+      reason: deterministic
+        ? "deterministic_control_probe_closed"
+        : auditedApprovalSatisfied
+          ? "audited_owner_approval_closed"
+          : "first_admissible_candidate_closed",
       self_limit: "Execute exactly one selected tool, independently verify its receipt, record the return, then halt."
     };
   }
