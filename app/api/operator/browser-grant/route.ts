@@ -3,34 +3,9 @@ import crypto from "node:crypto";
 import { operatorOwnerFromRequest } from "../../../../lib/operatorOwnerAuth";
 
 export const runtime = "nodejs";
-
-function secret(): string {
-  return process.env.RMF_BROWSER_GRANT_SECRET || "";
-}
-function b64url(input: string | Buffer): string {
-  return Buffer.from(input).toString("base64url");
-}
-function sign(body: string, key: string): string {
-  return crypto.createHmac("sha256", key).update(body).digest("base64url");
-}
-
-export async function POST(request: NextRequest) {
-  const owner = await operatorOwnerFromRequest(request);
-  if (!owner) return NextResponse.json({ ok:false, error:"not_authenticated_or_not_authorized" }, { status:401 });
-  const key = secret();
-  if (!key) return NextResponse.json({ ok:false, error:"browser_grant_not_configured" }, { status:503 });
-
-  const now = Math.floor(Date.now()/1000);
-  const payload = {
-    sub: owner.id,
-    actor: `owner:${owner.method}`,
-    aud: "rmf-browser-runtime",
-    scope: ["browser:state","browser:navigate","browser:observe","browser:receipt","browser:owner-session"],
-    iat: now,
-    exp: now + 300,
-    jti: crypto.randomUUID()
-  };
-  const body = b64url(JSON.stringify(payload));
-  const grant = `${body}.${sign(body,key)}`;
-  return NextResponse.json({ ok:true, grant, expires_at:new Date(payload.exp*1000).toISOString(), scope:payload.scope }, { headers:{"Cache-Control":"no-store"} });
-}
+const RUNTIME=(process.env.RMF_BROWSER_RUNTIME_URL||"https://browser-runtime-production-307b.up.railway.app").replace(/\/$/,"");
+function secret(){return process.env.RMF_BROWSER_GRANT_SECRET||""}
+function b64url(input:string|Buffer){return Buffer.from(input).toString("base64url")}
+function mint(owner:{id:string;method:string}){const key=secret();if(!key)throw new Error("browser_grant_not_configured");const now=Math.floor(Date.now()/1000);const payload={sub:owner.id,actor:`owner:${owner.method}`,aud:"rmf-browser-runtime",scope:["browser:state","browser:navigate","browser:observe","browser:receipt","browser:owner-session"],iat:now,exp:now+300,jti:crypto.randomUUID()};const body=b64url(JSON.stringify(payload));const sig=crypto.createHmac("sha256",key).update(body).digest("base64url");return{grant:`${body}.${sig}`,payload}}
+export async function POST(request:NextRequest){const owner=await operatorOwnerFromRequest(request);if(!owner)return NextResponse.json({ok:false,error:"not_authenticated_or_not_authorized"},{status:401});try{const {grant,payload}=mint(owner);return NextResponse.json({ok:true,grant,expires_at:new Date(payload.exp*1000).toISOString(),scope:payload.scope},{headers:{"Cache-Control":"no-store"}})}catch(e){return NextResponse.json({ok:false,error:String((e as Error)?.message||e)},{status:503})}}
+export async function GET(request:NextRequest){const owner=await operatorOwnerFromRequest(request);if(!owner)return NextResponse.json({ok:false,error:"not_authenticated_or_not_authorized"},{status:401});try{const {grant}=mint(owner);const target=request.nextUrl.searchParams.get("url")||"https://accounts.google.com/";const upstream=new URL("/session-state",RUNTIME);upstream.searchParams.set("url",target);const r=await fetch(upstream,{headers:{"x-rmf-browser-grant":grant},cache:"no-store"});const body=await r.text();return new NextResponse(body,{status:r.status,headers:{"content-type":r.headers.get("content-type")||"application/json","cache-control":"no-store"}})}catch(e){return NextResponse.json({ok:false,error:String((e as Error)?.message||e)},{status:502})}}
