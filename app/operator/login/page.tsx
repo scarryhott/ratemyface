@@ -18,11 +18,17 @@ export default function OperatorLoginPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  function safeNextPath() {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") || "/operator";
+    return next.startsWith("/operator") ? next : "/operator";
+  }
+
   async function bridge(accessToken:string) {
     const response=await fetch("/api/operator/owner/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access_token:accessToken})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(String(data?.error||"owner_session_failed"));
-    window.location.assign("/operator");
+    window.location.assign(safeNextPath());
   }
 
   async function run(fn:()=>Promise<void>){setLoading(true);setError("");setMessage("");try{await fn();}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setLoading(false);}}
@@ -30,7 +36,7 @@ export default function OperatorLoginPage() {
   function google(){
     setLoading(true);
     setError("");
-    window.location.assign("/auth/google?next=/operator");
+    window.location.assign(`/auth/google?next=${encodeURIComponent(safeNextPath())}`);
   }
 
   async function sendOtp(){await run(async()=>{if(!phone.trim())throw new Error("Enter your owner phone number in international format, for example +1…");const supabase=browserClient();const {error}=await supabase.auth.signInWithOtp({phone:phone.trim()});if(error)throw error;setOtpSent(true);setMessage("OTP sent. Enter the code from your phone.");});}
