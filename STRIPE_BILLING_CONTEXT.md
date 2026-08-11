@@ -1,76 +1,66 @@
 # Rate My Face — Stripe Billing Context
 
-## Status
-Stripe billing code is implemented in the Rate My Face Vercel backend, but production billing is not active until the required Stripe environment variables and webhook are configured.
+## Current model
+
+Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.4.0 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations.
 
 ## Action classifications
-- `searchProduct` — FREE. Product/affiliate acquisition path; no premium entitlement required.
-- `getEntitlements` — PAYMENT-INFRASTRUCTURE. Always available to an authenticated user so the GPT can discover access.
-- `createCheckoutSession` — PAYMENT-INFRASTRUCTURE. Creates a Stripe-hosted subscription Checkout URL; never collect card data in chat.
-- `createBillingPortalSession` — PAYMENT-INFRASTRUCTURE. Creates a Stripe-hosted billing-management URL for an existing customer.
-- `getUserContext` — PAID. Requires the server-side `premium` entitlement.
-- `saveUserContext` — PAID. Requires the server-side `premium` entitlement plus explicit personalization consent.
-- `deleteUserContext` — ACCOUNT/SECURITY. Never paywalled.
+- `searchProduct` — **FREE**. Product/affiliate acquisition path.
+- `getEntitlements` — **PAYMENT-INFRASTRUCTURE**. Returns authenticated entitlement state and credit balance.
+- `createCreditCheckoutSession` — **PAYMENT-INFRASTRUCTURE**. Creates Stripe-hosted one-time checkout for a Rate My Face credit pack.
+- `getPersonalNetwork` — **PAID**. Metered persistent profile/history/saved items/connections/report.
+- `updatePersonalNetwork` — **PAID**. Metered persistent profile/history/recommendation/feedback write.
+- `getUserContext` — **PAID**. Legacy metered persistent context.
+- `saveUserContext` — **PAID**. Legacy metered context write plus explicit personalization consent.
+- `deleteUserContext` — **ACCOUNT/SECURITY**. Never paywalled.
 
 ## Payment closure
-Authenticated Rate My Face user → `createCheckoutSession` → Stripe-hosted Checkout → verified Stripe webhook → durable Supabase/Postgres billing state → `premium` entitlement → paid Action admitted.
 
-A success-page redirect never grants access by itself. Entitlements are granted or revoked only from verified Stripe subscription state synchronized by the webhook.
+Authenticated Rate My Face user → `createCreditCheckoutSession` → Stripe-hosted Checkout → verified Stripe webhook → durable Supabase/Postgres credit ledger → sufficient credit balance → paid Action admitted.
 
-## Backend routes
-- `POST /api/billing/checkout` — creates subscription Checkout Session.
-- `GET /api/billing/entitlements` — returns active plan/features.
-- `POST /api/billing/portal` — creates Stripe Billing Portal Session.
-- `POST /api/stripe/webhook` — Stripe-only webhook; not exposed as a Custom GPT Action.
-- `GET|POST /api/memory/context` — premium-gated persistent memory.
-- `DELETE /api/memory/context` — free authenticated deletion.
+A success-page redirect never grants credits by itself. Credits are granted only by verified webhook processing and durable ledger state.
 
-## Database state
-The backend creates and maintains:
-- `rmf_billing_accounts` — Rate My Face user ↔ Stripe customer/subscription mapping.
-- `rmf_entitlements` — durable feature entitlements.
-- `rmf_stripe_events` — processed Stripe event receipts.
+## Backend state
 
-## Required Vercel environment variables
-Server-side only:
+The billing layer maintains subscription-compatible tables plus the active credit ledger:
+- `rmf_billing_accounts`
+- `rmf_entitlements`
+- `rmf_stripe_events`
+- `rmf_credit_accounts`
+- `rmf_credit_ledger`
+
+Current code defaults to 100 credits per pack and meters ordinary persistent memory/personal-network operations at 1 credit; reporting may cost more as declared by the endpoint.
+
+## Stripe configuration
+
+Required for the active credit checkout/webhook closure:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+- a valid credit Price ID available to the backend (`STRIPE_PRICE_ID_CREDITS` when overriding the code default)
+- Stripe webhook/event destination configured for `https://ratemyface.vercel.app/api/stripe/webhook`
+
+Legacy subscription support additionally uses:
 - `STRIPE_PRICE_ID_PREMIUM`
 
-Optional:
-- `STRIPE_SUCCESS_URL`
-- `STRIPE_CANCEL_URL`
-- `STRIPE_PORTAL_RETURN_URL`
+The health endpoint exposes separate booleans for Stripe secret, webhook, credit price, and subscription price configuration. Do not infer production readiness from code presence alone.
 
-Never commit actual Stripe secrets to GitHub.
+## Verification rule
 
-## Stripe dashboard setup
-1. Create a Rate My Face Premium product and recurring price in Stripe.
-2. Put that recurring Price ID in Vercel as `STRIPE_PRICE_ID_PREMIUM`.
-3. Put the Stripe secret API key in Vercel as `STRIPE_SECRET_KEY`.
-4. Register `https://ratemyface.vercel.app/api/stripe/webhook` as a Stripe webhook/event destination.
-5. Subscribe at minimum to:
-   - `checkout.session.completed`
-   - `checkout.session.async_payment_succeeded`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-6. Put that endpoint's signing secret in Vercel as `STRIPE_WEBHOOK_SECRET`.
-7. Redeploy and verify `/api/health` reports all Stripe configuration flags as true.
+Production payment health is established only when all relevant server configuration is present **and** a test purchase closes:
 
-## GPT behavior
-Before using a premium Action when access is uncertain, call `getEntitlements`.
+hosted Checkout → signed webhook accepted → Stripe event receipt stored → durable credit grant → `getEntitlements` returns the resulting credit balance → paid Action can consume credits.
 
-If a premium Action returns `upgrade_required`, explain the premium feature briefly. Only when the user wants to upgrade, call `createCheckoutSession` and provide its `checkout_url` unchanged. Do not claim payment succeeded until `getEntitlements` reports `premium=true` after the verified webhook has synchronized the subscription.
+Never collect raw card data in chat or GitHub, never store Stripe secrets in the repository, and never grant access from an unverified redirect.
 
-For billing management/cancellation requests, call `createBillingPortalSession` and provide its short-lived Stripe-hosted URL.
+## Custom GPT schema
 
-## Schema update requirement
-The Custom GPT Action schema changed to add:
-- `getEntitlements`
-- `createCheckoutSession`
-- `createBillingPortalSession`
+The deployed OpenAPI v2.4.0 billing/persistence operations are:
+- `getEntitlements` — PAYMENT-INFRASTRUCTURE
+- `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE
+- `getPersonalNetwork` — PAID
+- `updatePersonalNetwork` — PAID
+- `getUserContext` — PAID
+- `saveUserContext` — PAID
+- `deleteUserContext` — ACCOUNT/SECURITY
 
-and to classify `getUserContext` / `saveUserContext` as premium-gated with HTTP 402 `upgrade_required` responses.
-
-After the deployment succeeds, re-import `https://ratemyface.vercel.app/api/openapi` in the Custom GPT editor and publish/update the GPT.
+If the Custom GPT still has an older schema containing `createCheckoutSession` or `createBillingPortalSession`, re-import `https://ratemyface.vercel.app/api/openapi` before relying on the current credit flow.
