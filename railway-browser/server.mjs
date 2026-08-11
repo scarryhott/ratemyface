@@ -11,13 +11,16 @@ const server=http.createServer(app);
 const proxy=httpProxy.createProxyServer({target:"http://127.0.0.1:6080",ws:true});
 const PORT=Number(process.env.PORT||8080);
 const TOKEN=process.env.RMF_BROWSER_CONTROL_TOKEN||"";
+const GRANT_SECRET=process.env.RMF_BROWSER_GRANT_SECRET||"";
 const PROFILE=process.env.RMF_BROWSER_PROFILE_DIR||"/data/browser-profile";
 const ALLOWED=new Set((process.env.RMF_BROWSER_ALLOWED_HOSTS||"chatgpt.com").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
 const OWNER_VERIFY_URL="https://ratemyface.vercel.app/api/operator/owner";
 let context=null,ownerSession=null,vncProcess=null,websockifyProcess=null,expiryTimer=null;
 function timingMatch(h){if(!TOKEN)return false;const a=Buffer.from(h||""),b=Buffer.from(`Bearer ${TOKEN}`);return a.length===b.length&&crypto.timingSafeEqual(a,b);}
+function safeEqual(a,b){const x=Buffer.from(a||""),y=Buffer.from(b||"");return x.length===y.length&&crypto.timingSafeEqual(x,y);}
+function grantValid(req){if(!GRANT_SECRET)return false;const raw=String(req.headers["x-rmf-browser-grant"]||"");const [body,sig,...rest]=raw.split(".");if(!body||!sig||rest.length)return false;const expected=crypto.createHmac("sha256",GRANT_SECRET).update(body).digest("base64url");if(!safeEqual(sig,expected))return false;try{const p=JSON.parse(Buffer.from(body,"base64url").toString("utf8"));const now=Math.floor(Date.now()/1000);return p?.aud==="rmf-browser-runtime"&&Number(p?.iat)<=now+30&&Number(p?.exp)>now&&Array.isArray(p?.scope)&&p.scope.length>0;}catch{return false;}}
 async function ownerTokenValid(req){const headerToken=String(req.headers["x-rmf-owner-access"]||"");const cookieToken=String(req.cookies?.rmf_owner_access||"");const t=headerToken||cookieToken;if(!t)return false;try{const r=await fetch(OWNER_VERIFY_URL,{headers:{cookie:`rmf_owner_access=${encodeURIComponent(t)}`},redirect:"manual"});if(!r.ok)return false;const b=await r.json().catch(()=>null);return Boolean(b?.ok&&b?.owner?.id);}catch{return false;}}
-async function guard(req,res,next){if(timingMatch(req.headers.authorization))return next();if(await ownerTokenValid(req))return next();return res.status(401).json({ok:false,error:"unauthorized"});}
+async function guard(req,res,next){if(timingMatch(req.headers.authorization))return next();if(grantValid(req))return next();if(await ownerTokenValid(req))return next();return res.status(401).json({ok:false,error:"unauthorized"});}
 function allowedUrl(raw){const u=new URL(raw);if(u.protocol!=="https:")throw new Error("https_required");const h=u.hostname.toLowerCase();if(![...ALLOWED].some(x=>h===x||h.endsWith(`.${x}`)))throw new Error("host_not_allowed");return u.toString();}
 async function browser(){if(!context)context=await chromium.launchPersistentContext(PROFILE,{headless:false,args:["--no-sandbox","--disable-dev-shm-usage","--window-size=1440,900"]});return context;}
 async function page(){const c=await browser();return c.pages()[0]||await c.newPage();}
