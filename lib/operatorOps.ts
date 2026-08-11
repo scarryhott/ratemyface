@@ -1,5 +1,4 @@
 import { databaseConfigured, db } from "./db";
-import { ensureOperatorSchema } from "./operatorAgent";
 
 export type OpsCountRow = { total: number };
 
@@ -152,8 +151,9 @@ export async function getOperatorOpsOverview(): Promise<OpsOverview> {
     };
   }
 
-  await ensureOperatorSchema();
   const sql = db();
+  await sql`set statement_timeout = '8000ms'`;
+  await sql`set lock_timeout = '3000ms'`;
 
   const [
     projectCount,
