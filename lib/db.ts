@@ -4,7 +4,9 @@ let sqlClient: ReturnType<typeof postgres> | null = null;
 let schemaReady: Promise<void> | null = null;
 
 function connectionString(): string | null {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL || null;
+  // Vercel functions should use Supabase's IPv4-compatible Supavisor pooler.
+  // Keep DATABASE_URL as a fallback for local/persistent runtimes.
+  return process.env.POSTGRES_URL || process.env.DATABASE_URL || null;
 }
 
 export function databaseConfigured(): boolean {
@@ -14,7 +16,7 @@ export function databaseConfigured(): boolean {
 export function db() {
   if (sqlClient) return sqlClient;
   const url = connectionString();
-  if (!url) throw new Error("Database is not configured. Connect a Postgres integration in Vercel and expose DATABASE_URL or POSTGRES_URL.");
+  if (!url) throw new Error("Database is not configured. Connect a Postgres integration in Vercel and expose POSTGRES_URL or DATABASE_URL.");
   sqlClient = postgres(url, {
     max: 1,
     ssl: "require",
