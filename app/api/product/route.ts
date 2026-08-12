@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { actionOrOAuthAuthorized } from "../../../lib/supabaseAuth";
 
-const PARTNER_TAG = "ratemyface0a-20";
+const PARTNER_TAG = "ratemyfacegpt-20";
 const MARKETPLACE = "www.amazon.com";
 const TOKEN_URL = "https://api.amazon.com/auth/o2/token";
 const SEARCH_URL = "https://creatorsapi.amazon/catalog/v1/searchItems";
