@@ -16,3 +16,18 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+      - name: Check browser-runtime boot files
+        run: |
+          bash -n railway-browser/start.sh
+          bash -n railway-browser/start-smoke.sh
+          node --check railway-browser/server.mjs
+          node --check railway-browser/health-smoke.mjs
+          node --check railway-browser/health-stub.mjs
+          PORT=18081 bash railway-browser/start-smoke.sh
+      - name: Browser-runtime /health smoke
+        working-directory: railway-browser
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          npm install --omit=dev
+          PORT=18080 node health-smoke.mjs
