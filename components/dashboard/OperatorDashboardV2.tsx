@@ -9,6 +9,7 @@ import {
 import {
   LearningConsoleSection,
   CompareControlSection,
+  AppearanceAgentSection,
   SocialProvidersSection,
   RevenueSection,
   OpsHealthSection
@@ -41,6 +42,7 @@ type DashboardPayload = {
   gpt_portfolio?: any;
   learning_console?: any;
   compare_me_to_me?: any;
+  appearance_agent?: any;
   social_providers?: any;
   revenue_dashboard?: any;
   operations_health?: any;
@@ -312,6 +314,7 @@ export default function OperatorDashboardV2() {
             )}
             {data.learning_console && <LearningConsoleSection data={data.learning_console} />}
             {data.compare_me_to_me && <CompareControlSection data={data.compare_me_to_me} />}
+            {data.appearance_agent && <AppearanceAgentSection data={data.appearance_agent} />}
             {data.social_providers && <SocialProvidersSection data={data.social_providers} />}
             {data.revenue_dashboard && <RevenueSection data={data.revenue_dashboard} />}
             {data.operations_health && (

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { APPEARANCE_AGENT } from "../../../lib/appearanceAgent";
 import { COMPARE_ME_TO_ME } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
 import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
@@ -36,6 +37,15 @@ export async function GET() {
       status: COMPARE_ME_TO_ME.status,
       note: COMPARE_ME_TO_ME.note,
       tables: [...COMPARE_ME_TO_ME.tables]
+    },
+    appearance_agent: {
+      // FEATURE REMAINS DISABLED — not LIVE paid coaching; schema may exist.
+      enabled: APPEARANCE_AGENT.enabled,
+      status: APPEARANCE_AGENT.status,
+      note: APPEARANCE_AGENT.note,
+      tables: [...APPEARANCE_AGENT.tables],
+      target_days: APPEARANCE_AGENT.target_days,
+      depends_on: [...APPEARANCE_AGENT.depends_on]
     },
     social_providers: {
       // NO LIVE OAUTH until secrets configured — skeleton / stubs only.

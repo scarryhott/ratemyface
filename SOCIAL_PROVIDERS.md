@@ -47,5 +47,6 @@ Section **5b. Social Provider Connections** shows live connection counts (`0` wh
 - No live social OAuth until provider secrets are configured in Vercel env.
 - Leave Instagram / LinkedIn / TikTok client secrets empty; connect stubs stay `501`.
 - Compare Me To Me remains DISABLED.
+- Appearance Agent remains DISABLED (not LIVE paid coaching; see `APPEARANCE_AGENT.md`).
 - Amazon product path is untouched.
 - Never log access/refresh tokens — persist `token_ref` only when OAuth is later implemented.
