@@ -65,3 +65,15 @@ Append one concise entry per material experiment.
 - **Change made:** fixed an internal table-name collision that would have broken paid saved-recommendation writes by separating Personal Network recommendations into `rmf_personal_recommendations` (commit `ba7310254421f38d47924a161740469ca1ebe246`). No Action operation, endpoint, parameter contract, auth requirement, or OpenAPI schema changed.
 - **Rollback:** revert commit `ba7310254421f38d47924a161740469ca1ebe246`.
 - **Next:** verify the fix deploys, run one authenticated `getEntitlements → updatePersonalNetwork → getPersonalNetwork` transcript, then instrument activation events before judging the CTA experiment.
+
+### 2026-08-12 — Social provider OAuth framework (skeleton)
+- **Surface:** Vercel API + Supabase schema + operator dashboard
+- **Hypothesis:** An OAuth-ready `rmf_provider_connections` path (Instagram / LinkedIn / TikTok) can sit behind clear `not_configured` stubs without enabling scraping or live provider launch.
+- **Variant A:** n/a (infra skeleton only)
+- **Variant B:** n/a
+- **Metric:** stubs return `501 not_configured`; health `social_providers.enabled=false`; dashboard connection counts are live `0` or Unavailable — no fake metrics.
+- **Evidence/source:** migration `20260812190000_rmf_provider_connections_oauth.sql`, `/api/providers*`, `SOCIAL_PROVIDERS.md`, operator section 5b.
+- **Result:** pending ops apply of migration; no live OAuth until secrets configured.
+- **Change made:** token_ref/connected_at/revoked_at columns + RLS re-assert; connect/disconnect stubs; dashboard Social section; Compare Me To Me remains DISABLED; Amazon untouched.
+- **Rollback:** revert social-provider OAuth skeleton commits; leave prior `rmf_provider_connections` base table from personal/billing RLS migration.
+- **Next / monitor:** do not enable live social OAuth until Instagram/LinkedIn/TikTok credentials exist in Vercel; never log raw tokens — store encrypted `token_ref` only.

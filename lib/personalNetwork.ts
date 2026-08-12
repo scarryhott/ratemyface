@@ -13,9 +13,14 @@ export async function ensurePersonalNetworkSchema() {
     await sql`create table if not exists rmf_personal_profiles (user_id text primary key, profile jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now())`;
     await sql`create table if not exists rmf_interactions (id bigserial primary key, user_id text not null, kind text not null, summary text not null, data jsonb not null default '{}'::jsonb, created_at timestamptz not null default now())`;
     await sql`create table if not exists rmf_personal_recommendations (id bigserial primary key, user_id text not null, item_type text not null default 'product', title text, url text, data jsonb not null default '{}'::jsonb, feedback text, created_at timestamptz not null default now(), updated_at timestamptz not null default now())`;
-    await sql`create table if not exists rmf_provider_connections (user_id text not null, provider text not null, status text not null default 'planned', scopes text[] not null default '{}', external_subject text, profile_signals jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now(), primary key(user_id, provider))`;
+    await sql`create table if not exists rmf_provider_connections (user_id text not null, provider text not null, status text not null default 'planned', scopes text[] not null default '{}', external_subject text, profile_signals jsonb not null default '{}'::jsonb, token_ref text, token_expires_at timestamptz, connected_at timestamptz, revoked_at timestamptz, updated_at timestamptz not null default now(), primary key(user_id, provider))`;
+    await sql`alter table rmf_provider_connections add column if not exists token_ref text`;
+    await sql`alter table rmf_provider_connections add column if not exists token_expires_at timestamptz`;
+    await sql`alter table rmf_provider_connections add column if not exists connected_at timestamptz`;
+    await sql`alter table rmf_provider_connections add column if not exists revoked_at timestamptz`;
     await sql`create index if not exists rmf_interactions_user_idx on rmf_interactions(user_id, created_at desc)`;
     await sql`create index if not exists rmf_personal_recommendations_user_idx on rmf_personal_recommendations(user_id, created_at desc)`;
+    await sql`create index if not exists rmf_provider_connections_status_idx on rmf_provider_connections(status, updated_at desc)`;
   })();
   return ready;
 }
@@ -27,4 +32,15 @@ export async function history(userId:string, limit=20) { await ensurePersonalNet
 export async function saveRecommendation(userId:string,input:{item_type?:string,title?:string,url?:string,data?:Record<string,unknown>}) { await ensurePersonalNetworkSchema(); const sql=db(); const r=await sql`insert into rmf_personal_recommendations(user_id,item_type,title,url,data) values(${userId},${input.item_type||'product'},${input.title||null},${input.url||null},${sql.json((input.data||{}) as any)}) returning id,item_type,title,url,data,created_at`; return r[0]; }
 export async function recommendationFeedback(userId:string,id:number,feedback:string) { await ensurePersonalNetworkSchema(); const sql=db(); const r=await sql`update rmf_personal_recommendations set feedback=${feedback},updated_at=now() where id=${id} and user_id=${userId} returning id,feedback,updated_at`; return r[0]||null; }
 export async function savedItems(userId:string,limit=20) { await ensurePersonalNetworkSchema(); const sql=db(); return sql`select id,item_type,title,url,data,feedback,created_at,updated_at from rmf_personal_recommendations where user_id=${userId} order by created_at desc limit ${Math.min(Math.max(limit,1),50)}`; }
-export async function connections(userId:string) { await ensurePersonalNetworkSchema(); const sql=db(); return sql`select provider,status,scopes,profile_signals,updated_at from rmf_provider_connections where user_id=${userId} order by provider`; }
+/** Public connection rows — never select token_ref (encrypted secret ref only). */
+export async function connections(userId: string) {
+  await ensurePersonalNetworkSchema();
+  const sql = db();
+  return sql`
+    select provider, status, scopes, profile_signals, connected_at, revoked_at, updated_at,
+      (token_ref is not null) as has_token_ref
+    from rmf_provider_connections
+    where user_id = ${userId}
+    order by provider
+  `;
+}

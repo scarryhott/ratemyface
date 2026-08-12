@@ -109,6 +109,72 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
   );
 }
 
+type SocialProvidersControl = {
+  status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
+  enabled: false;
+  oauth_ready: false;
+  scraping: false;
+  auth_mode: string;
+  planned: string[];
+  connection_rows: MetricValue;
+  connected: MetricValue;
+  revoked: MetricValue;
+  gate: string;
+  table: string;
+  schema_ready: boolean;
+  note: string;
+};
+
+export function SocialProvidersSection({ data }: { data: SocialProvidersControl }) {
+  return (
+    <>
+      <SectionHeading
+        id="social"
+        title="5b. Social Provider Connections"
+        subtitle={data.gate}
+      />
+      <section className="card">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <span
+            style={{
+              borderRadius: 999,
+              padding: "6px 12px",
+              fontWeight: 700,
+              background: "#f2f4f7",
+              color: "#344054"
+            }}
+          >
+            Status: {data.status}
+          </span>
+          <span className="muted">
+            enabled={String(data.enabled)} · oauth_ready={String(data.oauth_ready)} · scraping=
+            {String(data.scraping)} · schema={data.schema_ready ? "ready" : "pending"} · table:{" "}
+            {data.table}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {data.note} Planned: {data.planned.join(", ")}. Counts are live empties (expect 0) or
+          Unavailable — no fake metrics. No live social OAuth until secrets are configured.
+        </p>
+        <section style={grid4}>
+          <MetricCard label="Connection rows" metric={data.connection_rows} />
+          <MetricCard label="Connected" metric={data.connected} />
+          <MetricCard label="Revoked" metric={data.revoked} />
+          <div className="card" style={{ minHeight: 122 }}>
+            <div className="muted" style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em" }}>
+              Auth mode
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 750, margin: "8px 0", color: "#111" }}>
+              {data.auth_mode}
+            </div>
+            <div className="muted">stubs: /api/providers · connect · disconnect</div>
+          </div>
+        </section>
+      </section>
+    </>
+  );
+}
+
 type RevenueDashboard = {
   amazon_tag: string;
   amazon_attribution: string;

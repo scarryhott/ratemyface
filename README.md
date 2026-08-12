@@ -17,6 +17,13 @@ The backend never invents ASINs.
 - `POST /api/product` — authenticated recommendation-link endpoint.
 - `GET /api/openapi` — dynamic OpenAPI 3.1 schema for the Custom GPT Action.
 - `GET /privacy` — public privacy policy for the GPT Action.
+- `GET /api/providers` — social provider connection catalog (OAuth skeleton; see `SOCIAL_PROVIDERS.md`).
+- `POST /api/providers/connect` — returns `501 not_configured` until provider credentials exist.
+- `POST /api/providers/disconnect` — revoke stub / soft-revoke when a row exists.
+
+## Social providers (OAuth skeleton)
+
+Planned: Instagram, LinkedIn, TikTok — **user-authorized OAuth only**. No scraping. No live connect until secrets are configured. Details: [`SOCIAL_PROVIDERS.md`](./SOCIAL_PROVIDERS.md).
 
 ## Required Vercel environment variable
 

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:account-learning": "node --experimental-strip-types --test lib/accountLearningShape.test.ts",
-    "test:rls": "node --experimental-strip-types --test lib/rmfPersonalBillingRls.test.ts lib/rmfCompareRls.test.ts",
+    "test:rls": "node --experimental-strip-types --test lib/rmfPersonalBillingRls.test.ts lib/rmfCompareRls.test.ts lib/rmfProviderConnectionsRls.test.ts",
     "test": "npm run test:account-learning && npm run test:rls"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COMPARE_ME_TO_ME } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
+import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
 import {
   stripeCreditsPriceConfigured,
   stripePriceConfigured,
@@ -35,6 +36,16 @@ export async function GET() {
       status: COMPARE_ME_TO_ME.status,
       note: COMPARE_ME_TO_ME.note,
       tables: [...COMPARE_ME_TO_ME.tables]
+    },
+    social_providers: {
+      // NO LIVE OAUTH until secrets configured — skeleton / stubs only.
+      enabled: SOCIAL_PROVIDER_OAUTH.enabled,
+      status: SOCIAL_PROVIDER_OAUTH.status,
+      note: SOCIAL_PROVIDER_OAUTH.note,
+      providers: [...SOCIAL_PROVIDER_OAUTH.providers],
+      auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
+      scraping: SOCIAL_PROVIDER_OAUTH.scraping,
+      table: SOCIAL_PROVIDER_OAUTH.table
     },
     account_learning: {
       openapi_version: "2.5.3",
