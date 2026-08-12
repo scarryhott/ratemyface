@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Railway healthchecks only need HTTP 200 on PORT. Chromium needs Xvfb, but
+# gating listen() on the X socket is what made deploys flake: identical images
+# failed when Xvfb was slow or the unix socket was not yet a -S file.
+# Bind Node first, then bring the display up (with retries) under the same PID 1.
+
 PROFILE_DIR="${RMF_BROWSER_PROFILE_DIR:-/data/browser-profile}"
 DISPLAY_VALUE="${DISPLAY:-:99}"
 PORT_VALUE="${PORT:-8080}"
@@ -9,42 +14,88 @@ DISPLAY_NUMBER="${DISPLAY_NUMBER%%.*}"
 DISPLAY_SOCKET="/tmp/.X11-unix/X${DISPLAY_NUMBER}"
 DISPLAY_LOCK="/tmp/.X${DISPLAY_NUMBER}-lock"
 
-mkdir -p "$PROFILE_DIR" /tmp/.X11-unix
-chmod 1777 /tmp/.X11-unix
+mkdir -p /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+mkdir -p "$PROFILE_DIR" 2>/dev/null || echo "[browser-runtime] warning: could not create $PROFILE_DIR" >&2
+
 export DISPLAY=":${DISPLAY_NUMBER}"
+export PORT="$PORT_VALUE"
 
-echo "browser-runtime startup DISPLAY=$DISPLAY PORT=$PORT_VALUE PROFILE_DIR=$PROFILE_DIR"
+echo "[browser-runtime] startup DISPLAY=$DISPLAY PORT=$PORT_VALUE PROFILE_DIR=$PROFILE_DIR"
 
-# A Railway container restart can preserve stale X11 and Chrome lock files even
-# though their owning processes are gone. Remove only those per-process locks.
+# A Railway volume remount can preserve Chrome singleton locks after the old
+# PID is gone. X11 sockets live in /tmp and can also be stale on restart.
 rm -f "$DISPLAY_SOCKET" "$DISPLAY_LOCK"
 rm -f "$PROFILE_DIR/SingletonLock" "$PROFILE_DIR/SingletonSocket" "$PROFILE_DIR/SingletonCookie"
 
-Xvfb "$DISPLAY" -screen 0 1440x900x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
-XVFB_PID=$!
-
-XVFB_READY=0
-for _ in $(seq 1 100); do
-  if kill -0 "$XVFB_PID" 2>/dev/null && [ -S "$DISPLAY_SOCKET" ]; then
-    XVFB_READY=1
-    break
+display_ready() {
+  if [ ! -e "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; then
+    return 1
   fi
-  if ! kill -0 "$XVFB_PID" 2>/dev/null; then
-    echo "Xvfb exited before display became ready" >&2
-    cat /tmp/xvfb.log >&2 || true
-    exit 1
+  if command -v xdpyinfo >/dev/null 2>&1; then
+    xdpyinfo -display "$DISPLAY" >/dev/null 2>&1
+    return $?
   fi
-  sleep 0.1
-done
+  return 0
+}
 
-if [ "$XVFB_READY" -ne 1 ] || ! kill -0 "$XVFB_PID" 2>/dev/null; then
-  echo "Xvfb display did not become ready" >&2
+xvfb_alive() {
+  [ -n "${XVFB_PID:-}" ] && kill -0 "$XVFB_PID" 2>/dev/null
+}
+
+start_xvfb() {
+  Xvfb "$DISPLAY" -screen 0 1440x900x24 -ac -nolisten tcp >/tmp/xvfb.log 2>&1 &
+  XVFB_PID=$!
+  echo "[browser-runtime] started Xvfb pid=$XVFB_PID DISPLAY=$DISPLAY"
+}
+
+wait_for_xvfb() {
+  local i
+  for i in {1..150}; do
+    if xvfb_alive && display_ready; then
+      echo "[browser-runtime] X socket ready at $DISPLAY_SOCKET"
+      return 0
+    fi
+    if ! xvfb_alive; then
+      echo "[browser-runtime] Xvfb exited before display became ready" >&2
+      cat /tmp/xvfb.log >&2 || true
+      return 1
+    fi
+    sleep 0.1
+  done
+  echo "[browser-runtime] Xvfb display did not become ready" >&2
   cat /tmp/xvfb.log >&2 || true
-  exit 1
-fi
+  return 1
+}
 
-fluxbox >/tmp/fluxbox.log 2>&1 &
-FLUXBOX_PID=$!
+ensure_display() {
+  local attempt
+  for attempt in 1 2 3; do
+    if xvfb_alive && display_ready; then
+      return 0
+    fi
+    if xvfb_alive; then
+      kill -TERM "$XVFB_PID" 2>/dev/null || true
+      wait "$XVFB_PID" 2>/dev/null || true
+    fi
+    rm -f "$DISPLAY_SOCKET" "$DISPLAY_LOCK"
+    echo "[browser-runtime] Xvfb start attempt $attempt"
+    start_xvfb
+    if wait_for_xvfb; then
+      fluxbox >/tmp/fluxbox.log 2>&1 &
+      FLUXBOX_PID=$!
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "[browser-runtime] Xvfb not confirmed; /health still served, headed Chrome will wait" >&2
+  return 1
+}
+
+echo "[browser-runtime] starting Node server on PORT=$PORT_VALUE (HTTP before Xvfb)"
+SERVER_JS="${RMF_BROWSER_SERVER:-/app/server.mjs}"
+node "$SERVER_JS" &
+NODE_PID=$!
 
 cleanup() {
   trap - EXIT TERM INT
@@ -52,31 +103,23 @@ cleanup() {
     kill -TERM "$NODE_PID" 2>/dev/null || true
     wait "$NODE_PID" 2>/dev/null || true
   fi
-  kill -TERM "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
-  wait "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
+  kill -TERM "${FLUXBOX_PID:-}" "${XVFB_PID:-}" 2>/dev/null || true
+  wait "${FLUXBOX_PID:-}" "${XVFB_PID:-}" 2>/dev/null || true
 }
 trap cleanup EXIT TERM INT
 
-echo "Xvfb ready on DISPLAY=$DISPLAY PID=$XVFB_PID; starting Node server on PORT=$PORT_VALUE"
-node /app/server.mjs &
-NODE_PID=$!
+# Bring X up in parallel with Node listen. Do not exit if the display is late;
+# Railway would otherwise mark the deploy failed while /health is already valid.
+ensure_display || true
 
-# Keep PID 1 supervising both required processes. If either Node or Xvfb exits,
-# stop the other and exit so Railway restarts the complete display/browser unit.
-set +e
-wait -n "$NODE_PID" "$XVFB_PID"
-EXIT_STATUS=$?
-set -e
+while kill -0 "$NODE_PID" 2>/dev/null; do
+  if ! xvfb_alive; then
+    echo "[browser-runtime] Xvfb lost; restarting display" >&2
+    cat /tmp/xvfb.log >&2 || true
+    ensure_display || true
+  fi
+  sleep 1
+done
 
-if [ "$EXIT_STATUS" -eq 0 ]; then
-  EXIT_STATUS=1
-fi
-
-if ! kill -0 "$XVFB_PID" 2>/dev/null; then
-  echo "Xvfb exited; restarting browser runtime" >&2
-  cat /tmp/xvfb.log >&2 || true
-else
-  echo "Node browser server exited; restarting browser runtime" >&2
-fi
-
-exit "$EXIT_STATUS"
+echo "[browser-runtime] Node browser server exited; restarting browser runtime" >&2
+exit 1

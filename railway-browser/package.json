@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.2.1",
   "type": "module",
-  "scripts": {"start":"node server.mjs"},
+  "scripts": {
+    "start": "node server.mjs",
+    "test:syntax": "node --check server.mjs",
+    "test:health": "node health-smoke.mjs"
+  },
   "dependencies": {"express":"^5.1.0","http-proxy":"^1.18.1","playwright":"1.62.1"}
 }
