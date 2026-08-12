@@ -28,6 +28,6 @@ export async function GET() {
       credits_per_pack: 100,
       metered_memory_cost: 1
     },
-    partner_tag: "ratemyface0a-20"
+    partner_tag: "ratemyfacegpt-20"
   });
 }
