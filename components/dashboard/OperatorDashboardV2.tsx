@@ -13,14 +13,13 @@ import {
   OpsHealthSection
 } from "./ControlSections";
 import { FounderCreditPanel } from "./FounderCreditPanel";
+import { AgentConsoleSection } from "./AgentConsole";
 import {
   pill,
   button,
   secondaryButton,
   linkButton,
   input,
-  navTabs,
-  tabLink,
   when,
   funnelRow,
   grid2
@@ -46,22 +45,13 @@ type DashboardPayload = {
   ops?: any;
 };
 
-const SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "credits", label: "Credits" },
-  { id: "gpt-portfolio", label: "GPT portfolio" },
-  { id: "learning", label: "Learning" },
-  { id: "compare", label: "Compare" },
-  { id: "revenue", label: "Revenue" },
-  { id: "ops-health", label: "Ops health" }
-];
-
 export default function OperatorDashboardV2() {
   const [secret, setSecret] = useState("");
   const [owner, setOwner] = useState<Owner | null>(null);
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showMetrics, setShowMetrics] = useState(false);
 
   async function loadOwner() {
     const response = await fetch("/api/operator/owner", { cache: "no-store", credentials: "same-origin" });
@@ -118,6 +108,7 @@ export default function OperatorDashboardV2() {
     setData(null);
   }
 
+  const canOperate = Boolean(owner || secret);
   const ops = data?.ops;
   const billing = ops?.billing;
   const infrastructure = ops?.infrastructure;
@@ -127,18 +118,13 @@ export default function OperatorDashboardV2() {
     ? "Needs attention"
     : data?.database_configured
       ? "Operational"
-      : data
+      : canOperate
         ? "Waiting for data"
         : "Sign in required";
   const premiumConfigured = Boolean(stripe?.subscription_price_configured);
   const stripeProductOk = Boolean(
     stripe?.secret_configured && stripe?.credit_price_configured && stripe?.webhook_configured
   );
-  const productCreditLabel =
-    data?.credit_economy?.product_label ||
-    creditModel?.label ||
-    infrastructure?.product_credits?.label ||
-    "Rate My Face product credits (Stripe ledger)";
 
   return (
     <main style={{ maxWidth: 1240, margin: "0 auto", paddingBottom: 60 }}>
@@ -156,11 +142,10 @@ export default function OperatorDashboardV2() {
           <p style={{ marginBottom: 8 }}>
             <a href="/operator">← Operator console</a>
           </p>
-          <h1 style={{ margin: 0, fontSize: 36 }}>Rate My Face Business · Dashboard v2</h1>
-          <p className="muted" style={{ maxWidth: 780 }}>
-            Owner-only business controller: overview, credit economy, GPT portfolio, Account Learning, Compare Me To Me
-            (disabled), revenue, and ops health. {productCreditLabel}. Vercel Hobby / AI Gateway are infrastructure — not
-            product credits.
+          <h1 style={{ margin: 0, fontSize: 36 }}>Rate My Face · Agent Console</h1>
+          <p className="muted" style={{ maxWidth: 720 }}>
+            Chat with and manage the operator agent. Strategy impact reports land here after improve cycles. Business
+            metrics stay secondary below.
           </p>
         </div>
         <div
@@ -185,14 +170,14 @@ export default function OperatorDashboardV2() {
               <div className="muted">Owner session · {owner.method}</div>
             </>
           ) : (
-            <div>Owner sign-in required for live business data.</div>
+            <div>Owner sign-in required to chat with and manage agents.</div>
           )}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {owner ? (
             <>
               <button style={button} onClick={() => loadDashboard()} disabled={loading}>
-                {loading ? "Refreshing…" : "Refresh data"}
+                {loading ? "Refreshing…" : "Refresh"}
               </button>
               <button style={secondaryButton} onClick={signOut}>
                 Sign out
@@ -220,137 +205,128 @@ export default function OperatorDashboardV2() {
         )}
       </section>
 
-      <nav style={navTabs} aria-label="Dashboard sections">
-        {SECTIONS.map((s) => (
-          <a key={s.id} href={`#${s.id}`} style={tabLink}>
-            {s.label}
-          </a>
-        ))}
-      </nav>
-
       {error && (
         <section className="card" style={{ borderColor: "#f04438" }}>
           <strong>Dashboard error:</strong> {error}
         </section>
       )}
 
-      {data?.business_overview && (
-        <>
-          <BusinessOverviewSection data={data.business_overview} />
-
-          {data.credit_economy && (
-            <CreditEconomySection data={data.credit_economy}>
-              <FounderCreditPanel
-                canMutate={Boolean(owner || secret)}
-                authHeaders={authHeaders}
-                onMutated={() => loadDashboard()}
-                signupCredits={creditModel?.signup_credits ?? 100}
-                packSize={creditModel?.credits_per_pack ?? 100}
-              />
-            </CreditEconomySection>
-          )}
-
-          <section style={{ ...grid2, marginTop: 16 }}>
-            <div className="card">
-              <h3 style={{ marginTop: 0 }}>Plan & Stripe wiring</h3>
-              <div style={funnelRow}>
-                <span>Active paid path</span>
-                <strong>RMF product credits (packs of {creditModel?.credits_per_pack ?? 100})</strong>
-              </div>
-              <div style={funnelRow}>
-                <span>Credit price configured</span>
-                <strong>{stripe?.credit_price_configured ? "yes" : "no"}</strong>
-              </div>
-              <div style={funnelRow}>
-                <span>Webhook configured</span>
-                <strong>{stripe?.webhook_configured ? "yes" : "no"}</strong>
-              </div>
-              <div style={funnelRow}>
-                <span>Secret configured</span>
-                <strong>{stripe?.secret_configured ? "yes" : "no"}</strong>
-              </div>
-              <div style={funnelRow}>
-                <span>Premium subscription</span>
-                <strong>{premiumConfigured ? "env configured" : "not configured"}</strong>
-              </div>
-              {!premiumConfigured && (
-                <p className="muted" style={{ marginBottom: 0 }}>
-                  Premium subscription checkout is disabled until <code>STRIPE_PRICE_ID_PREMIUM</code> is set. Paid
-                  persistence maps to Stripe RMF credit spend only.
-                </p>
-              )}
-            </div>
-            <div className="card">
-              <h3 style={{ marginTop: 0 }}>Vercel infrastructure (not product credits)</h3>
-              <div style={funnelRow}>
-                <span>Hosting plan</span>
-                <strong>
-                  {infrastructure?.vercel_hosting?.plan || "Hobby"} · {infrastructure?.vercel_hosting?.status || "Active"}
-                </strong>
-              </div>
-              <div style={funnelRow}>
-                <span>AI Gateway balance</span>
-                <strong>
-                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-                    Number(infrastructure?.vercel_ai_gateway?.balance_usd ?? 0)
-                  )}
-                </strong>
-              </div>
-              <p className="muted" style={{ marginBottom: 0 }}>
-                {infrastructure?.vercel_ai_gateway?.note ||
-                  "Vercel AI Gateway USD is not Rate My Face product credits."}
-              </p>
-            </div>
-          </section>
-
-          {data.gpt_portfolio && (
-            <GptPortfolioSection summary={data.gpt_portfolio.summary} gpts={data.gpt_portfolio.gpts || []} />
-          )}
-
-          {data.learning_console && <LearningConsoleSection data={data.learning_console} />}
-          {data.compare_me_to_me && <CompareControlSection data={data.compare_me_to_me} />}
-          {data.revenue_dashboard && <RevenueSection data={data.revenue_dashboard} />}
-          {data.operations_health && (
-            <OpsHealthSection
-              data={data.operations_health}
-              ownerSignedIn={Boolean(owner)}
-              stripeConfigured={stripeProductOk}
-              databaseConfigured={Boolean(data.database_configured)}
-            />
-          )}
-
-          {!!ops?.recent_runs?.length && (
-            <section className="card" style={{ marginTop: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Recent agent runs</h3>
-              {ops.recent_runs.slice(0, 8).map((r: any) => (
-                <div
-                  key={r.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    padding: "11px 0",
-                    borderBottom: "1px solid #eee"
-                  }}
-                >
-                  <div>
-                    <strong>Run #{r.id}</strong> · {r.status}
-                    <div className="muted">
-                      {r.model || "model n/a"} · L{r.authority} · {r.closure_state || "closure n/a"}
-                    </div>
-                  </div>
-                  <small>{when(r.created_at)}</small>
-                </div>
-              ))}
-            </section>
-          )}
-
-          <p className="muted">
-            Generated {when(data.generated_at)}
-            {data.actor ? ` · actor ${data.actor}` : ""} · {data.version || "dashboard_v2"}
+      {/* Primary surface: Agent Console — available as soon as owner/secret can operate */}
+      {canOperate ? (
+        <AgentConsoleSection
+          canOperate={canOperate}
+          authHeaders={authHeaders}
+          onBusinessRefresh={() => loadDashboard()}
+        />
+      ) : (
+        <section className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Agent Console</h2>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Sign in to chat with the operator, run improve cycles, approve work, and read strategy reports.
           </p>
-        </>
+        </section>
       )}
+
+      {/* Secondary: collapsed business metrics */}
+      <section className="card" style={{ marginTop: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Business metrics</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              Optional reference panels (credits, GPTs, learning, revenue, ops). Not the primary control surface.
+            </p>
+          </div>
+          <button style={secondaryButton} onClick={() => setShowMetrics((v) => !v)} disabled={!data?.business_overview}>
+            {showMetrics ? "Hide metrics" : "Show metrics"}
+          </button>
+        </div>
+
+        {showMetrics && data?.business_overview && (
+          <div style={{ marginTop: 16 }}>
+            <BusinessOverviewSection data={data.business_overview} />
+
+            {data.credit_economy && (
+              <CreditEconomySection data={data.credit_economy}>
+                <FounderCreditPanel
+                  canMutate={canOperate}
+                  authHeaders={authHeaders}
+                  onMutated={() => loadDashboard()}
+                  signupCredits={creditModel?.signup_credits ?? 100}
+                  packSize={creditModel?.credits_per_pack ?? 100}
+                />
+              </CreditEconomySection>
+            )}
+
+            <section style={{ ...grid2, marginTop: 16 }}>
+              <div className="card">
+                <h3 style={{ marginTop: 0 }}>Plan & Stripe wiring</h3>
+                <div style={funnelRow}>
+                  <span>Active paid path</span>
+                  <strong>RMF product credits (packs of {creditModel?.credits_per_pack ?? 100})</strong>
+                </div>
+                <div style={funnelRow}>
+                  <span>Credit price configured</span>
+                  <strong>{stripe?.credit_price_configured ? "yes" : "no"}</strong>
+                </div>
+                <div style={funnelRow}>
+                  <span>Webhook configured</span>
+                  <strong>{stripe?.webhook_configured ? "yes" : "no"}</strong>
+                </div>
+                <div style={funnelRow}>
+                  <span>Secret configured</span>
+                  <strong>{stripe?.secret_configured ? "yes" : "no"}</strong>
+                </div>
+                <div style={funnelRow}>
+                  <span>Premium subscription</span>
+                  <strong>{premiumConfigured ? "env configured" : "not configured"}</strong>
+                </div>
+              </div>
+              <div className="card">
+                <h3 style={{ marginTop: 0 }}>Vercel infrastructure (not product credits)</h3>
+                <div style={funnelRow}>
+                  <span>Hosting plan</span>
+                  <strong>
+                    {infrastructure?.vercel_hosting?.plan || "Hobby"} ·{" "}
+                    {infrastructure?.vercel_hosting?.status || "Active"}
+                  </strong>
+                </div>
+                <div style={funnelRow}>
+                  <span>AI Gateway balance</span>
+                  <strong>
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                      Number(infrastructure?.vercel_ai_gateway?.balance_usd ?? 0)
+                    )}
+                  </strong>
+                </div>
+                <p className="muted" style={{ marginBottom: 0 }}>
+                  {infrastructure?.vercel_ai_gateway?.note ||
+                    "Vercel AI Gateway USD is not Rate My Face product credits."}
+                </p>
+              </div>
+            </section>
+
+            {data.gpt_portfolio && (
+              <GptPortfolioSection summary={data.gpt_portfolio.summary} gpts={data.gpt_portfolio.gpts || []} />
+            )}
+            {data.learning_console && <LearningConsoleSection data={data.learning_console} />}
+            {data.compare_me_to_me && <CompareControlSection data={data.compare_me_to_me} />}
+            {data.revenue_dashboard && <RevenueSection data={data.revenue_dashboard} />}
+            {data.operations_health && (
+              <OpsHealthSection
+                data={data.operations_health}
+                ownerSignedIn={Boolean(owner)}
+                stripeConfigured={stripeProductOk}
+                databaseConfigured={Boolean(data.database_configured)}
+              />
+            )}
+
+            <p className="muted">
+              Generated {when(data.generated_at)}
+              {data.actor ? ` · actor ${data.actor}` : ""} · {data.version || "dashboard_v2"}
+            </p>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

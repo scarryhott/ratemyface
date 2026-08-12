@@ -1,11 +1,49 @@
 import { type Authority,type OperatorToolName,getOperatorToolRegistry,getOperatorToolSpec } from "./operatorTools";
+export interface OperatorBusinessImpact {
+  bottleneck: string;
+  hypothesis: string;
+  recommended_next_step: string;
+  expected_metric_effect: string;
+  funnel_stage: string;
+  confidence: string;
+}
 export interface OperatorCandidate{id:string;tool:OperatorToolName;authority:Authority;intent:string;reason:string;expected_return:string;reversible:boolean;invariants:string[];args:Record<string,unknown>}
-export interface OperatorModelPlan{summary:string;observations:string[];candidates:OperatorCandidate[];required_authority:Authority;requires_human_approval:boolean;verification:string[]}
+export interface OperatorModelPlan{
+  summary:string;
+  observations:string[];
+  candidates:OperatorCandidate[];
+  required_authority:Authority;
+  requires_human_approval:boolean;
+  verification:string[];
+  business_impact?: OperatorBusinessImpact | null;
+}
 export interface CandidateEvaluation{candidate:OperatorCandidate;tool_authority:Authority|null;configured:boolean;admitted:boolean;reversible:boolean;verifiable:boolean;closed:boolean;reasons:string[]}
 export interface ClosureDecision{harness:"closure-native-v1";state:"execute"|"awaiting_approval"|"halted";selected:OperatorCandidate|null;evaluations:CandidateEvaluation[];required_authority:Authority;reason:string;self_limit:string}
 function authority(v:unknown,f:Authority=1):Authority{const n=Math.max(0,Math.min(6,Number(v??f)));return(Number.isFinite(n)?Math.trunc(n):f)as Authority} function strings(v:unknown,max=12){return Array.isArray(v)?v.map(x=>String(x||"").trim()).filter(Boolean).slice(0,max):[]} function record(v:unknown):Record<string,unknown>{return v&&typeof v==="object"&&!Array.isArray(v)?v as Record<string,unknown>:{};} function isToolName(v:string):v is OperatorToolName{return Boolean(getOperatorToolSpec(v));}
 function normalizeCandidate(v:unknown,i:number):OperatorCandidate|null{const r=record(v),tool=String(r.tool||"").trim();if(!isToolName(tool))return null;const s=getOperatorToolSpec(tool)!;return{id:String(r.id||`candidate-${i+1}`).slice(0,80),tool,authority:authority(r.authority,s.authority),intent:String(r.intent||"").slice(0,1000),reason:String(r.reason||"").slice(0,2000),expected_return:String(r.expected_return||"").slice(0,2000),reversible:r.reversible===undefined?s.reversible:Boolean(r.reversible),invariants:strings(r.invariants,20),args:record(r.args)}}
-export function normalizeModelPlan(v:unknown):OperatorModelPlan{const r=record(v),c=Array.isArray(r.candidates)?r.candidates.map(normalizeCandidate).filter(Boolean).slice(0,8) as OperatorCandidate[]:[];return{summary:String(r.summary||"").slice(0,4000),observations:strings(r.observations,20),candidates:c,required_authority:authority(r.required_authority,1),requires_human_approval:Boolean(r.requires_human_approval),verification:strings(r.verification,20)}}
+export function normalizeModelPlan(v:unknown):OperatorModelPlan{
+  const r=record(v),c=Array.isArray(r.candidates)?r.candidates.map(normalizeCandidate).filter(Boolean).slice(0,8) as OperatorCandidate[]:[];
+  const impactRaw=record(r.business_impact);
+  const business_impact = Object.keys(impactRaw).length
+    ? {
+        bottleneck:String(impactRaw.bottleneck||"").slice(0,500),
+        hypothesis:String(impactRaw.hypothesis||"").slice(0,1000),
+        recommended_next_step:String(impactRaw.recommended_next_step||"").slice(0,1000),
+        expected_metric_effect:String(impactRaw.expected_metric_effect||"").slice(0,1000),
+        funnel_stage:String(impactRaw.funnel_stage||"unknown").slice(0,120),
+        confidence:String(impactRaw.confidence||"low").slice(0,40)
+      }
+    : null;
+  return{
+    summary:String(r.summary||"").slice(0,4000),
+    observations:strings(r.observations,20),
+    candidates:c,
+    required_authority:authority(r.required_authority,1),
+    requires_human_approval:Boolean(r.requires_human_approval),
+    verification:strings(r.verification,20),
+    business_impact
+  };
+}
 function tasksetCandidate(signal:any):OperatorCandidate|null{if(String(signal?.kind||"")!=="control_probe")return null;const payload=record(signal?.payload);const requested=String(payload.probe||payload.capability||"");if(requested==="browser_observe"||requested==="browser"||payload.url){return{id:"control-probe-browser-observe",tool:"browser_observe",authority:2,intent:"Prove authenticated bounded browser observation through the Railway runtime without mutating the target account.",reason:"The browser L2 probe requires runtime health, two independent observations, matching snapshot digests, a receipt, and halt.",expected_return:"Authenticated Railway health plus two independently returned ChatGPT observation digests that agree.",reversible:true,invariants:["allowlisted_https_target_only","no_account_mutation","no_cookie_or_password_export","independent_reread_must_match","halt_after_receipt"],args:{url:String(payload.url||"https://chatgpt.com/")}};}return{id:"control-probe-github-branch",tool:"github_branch_diagnostic",authority:2,intent:"Demonstrate bounded external control by creating an isolated GitHub branch and one diagnostic receipt without merging or touching the base branch.",reason:"Deterministic GitHub control probe.",expected_return:"Verified isolated-branch readback receipt.",reversible:true,invariants:["do_not_modify_base_branch","do_not_merge","independent_readback_must_match_expected_digest","halt_after_one_mutation"],args:{}};}
 function evaluate(c:OperatorCandidate,a:Authority):CandidateEvaluation{const s=getOperatorToolSpec(c.tool),runtime=getOperatorToolRegistry().find(t=>t.name===c.tool),reasons:string[]=[];if(!s)reasons.push("unknown_tool");const required=s?Math.max(s.authority,c.authority)as Authority:c.authority,configured=Boolean(runtime?.configured);if(!configured)reasons.push("tool_not_configured");const admitted=a>=required;if(!admitted)reasons.push(`authority_${required}_required`);const reversible=!s?.mutating||(s.reversible&&c.reversible);if(!reversible)reasons.push("mutation_not_reversible");const verifiable=c.expected_return.trim().length>0&&c.invariants.length>0;if(!verifiable)reasons.push("missing_expected_return_or_invariants");return{candidate:{...c,authority:required},tool_authority:s?.authority??null,configured,admitted,reversible,verifiable,closed:Boolean(s)&&configured&&admitted&&reversible&&verifiable,reasons};}
 export function resolveClosure(signal:any,plan:OperatorModelPlan,admittedAuthority:Authority):ClosureDecision{const deterministic=tasksetCandidate(signal),candidates=deterministic?[deterministic,...plan.candidates.filter(c=>c.tool!==deterministic.tool)]:plan.candidates,evaluations=candidates.map(c=>evaluate(c,admittedAuthority)),selectedEvaluation=evaluations.find(c=>c.closed)||null;if(selectedEvaluation){const selected=selectedEvaluation.candidate,explicit=String(signal?.kind||"")==="control_probe",payload=record(signal?.payload),ownerApprovedAuthority=authority(payload.owner_approved_authority,0),audited=Boolean(payload.owner_approved)&&ownerApprovedAuthority>=selected.authority;if(plan.requires_human_approval&&!explicit&&!audited)return{harness:"closure-native-v1",state:"awaiting_approval",selected,evaluations,required_authority:selected.authority,reason:"model_requested_human_approval",self_limit:"No tool is executed until an authenticated approval is recorded and the task is re-queued."};return{harness:"closure-native-v1",state:"execute",selected,evaluations,required_authority:selected.authority,reason:deterministic?"deterministic_control_probe_closed":audited?"audited_owner_approval_closed":"first_admissible_candidate_closed",self_limit:"Execute exactly one selected tool, independently verify its receipt, record the return, then halt."};}const requiredAuthority=evaluations.reduce<Authority>((x,e)=>e.candidate.authority>x?e.candidate.authority:x,plan.required_authority),blockedByAuthority=evaluations.some(e=>e.reasons.some(r=>r.startsWith("authority_"))),blockedByConfiguration=evaluations.some(e=>e.reasons.includes("tool_not_configured"));if(blockedByAuthority||plan.required_authority>admittedAuthority)return{harness:"closure-native-v1",state:"awaiting_approval",selected:evaluations[0]?.candidate||null,evaluations,required_authority:requiredAuthority,reason:"authority_not_admitted",self_limit:"The proposed action exceeds admitted authority; record an approval request and execute nothing."};return{harness:"closure-native-v1",state:"halted",selected:null,evaluations,required_authority:requiredAuthority,reason:blockedByConfiguration?"required_tool_not_configured":"no_candidate_closed",self_limit:"No candidate satisfies the closure invariants; execute nothing and return the blocking evidence."};}
