@@ -1,17 +1,8 @@
 import { databaseConfigured, db, ensureMemorySchema } from "./db";
 import { ensurePersonalNetworkSchema, profile, updateProfile } from "./personalNetwork";
+import { hasPreferencePayload } from "./accountLearningShape";
 
-/** True when a jsonb blob has no meaningful preference/content payload. */
-export function hasPreferencePayload(value: unknown): boolean {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
-  const entries = Object.entries(value as Record<string, unknown>).filter(([key, val]) => {
-    if (key === "consent_personalization" || key === "consent_history") return false;
-    if (val == null || val === "") return false;
-    if (typeof val === "object" && !Array.isArray(val) && Object.keys(val as object).length === 0) return false;
-    return true;
-  });
-  return entries.length > 0;
-}
+export { hasPreferencePayload, shapePersonalProfilePayload } from "./accountLearningShape";
 
 /** Dual-write: legacy context → Personal Network profile (canonical store). */
 export async function syncLegacyContextToPersonal(userId: string, context: Record<string, unknown>) {

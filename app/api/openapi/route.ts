@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.2",
+      version: "2.5.3",
       description:
-        "FREE product links + credit-metered account learning. Ordinary chat is not storage. Remember/consent → MUST write Actions. Preference questions → MUST getPersonalNetwork then getUserContext if empty. Dual-write syncs stores. On 402 use checkout. Never invent prefs from ChatGPT Memory."
+        "FREE product links + credit-metered account learning. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 use checkout."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
       "/api/personal": {
         get: {
           operationId: "getPersonalNetwork",
-          summary: "PAID/METERED — MUST call first on preference/memory questions (1; report 5)",
+          summary: "REQUIRED for preference questions — fetch saved Rate My Face prefs (1; report 5)",
           description:
-            "MUST call on preference/memory questions (e.g. “What do you know about my preferences?”) before answering — natural language is enough. mode=profile first; if empty also call getUserContext. Falls back to legacy context when profile empty. Costs 1 (report=5). On 402 do not invent prefs.",
+            "Call FIRST when user asks preferences/memory/what you know about them. mode=profile. Do not answer from chat, Memory, or web. If found=false/empty also call getUserContext. Natural language is enough. Costs 1 (report=5). On 402 do not invent prefs.",
           parameters: [
             {
               name: "mode",
@@ -100,9 +100,9 @@ export async function GET(request: NextRequest) {
       "/api/memory/context": {
         get: {
           operationId: "getUserContext",
-          summary: "PAID/METERED — MUST call if getPersonalNetwork profile empty (1)",
+          summary: "PAID/METERED — call if getPersonalNetwork found=false/empty (1)",
           description:
-            "Legacy/mirror preference read. After getPersonalNetwork mode=profile returns empty/null, MUST call this in the same turn. Falls back to personal profile when legacy empty. Answer only from returned data. Costs 1 credit.",
+            "Legacy/mirror preference read. After getPersonalNetwork mode=profile returns found=false/empty/null, MUST call this same turn. Falls back to personal profile when legacy empty. Answer only from returned data. Costs 1 credit.",
           responses: {
             "200": { description: "Context" },
             "402": {

@@ -429,7 +429,7 @@ export default function OperatorBusinessDashboard() {
             <div style={funnelRow}><span>Active OAuth tokens</span><strong>{accounts?.active_oauth_tokens || 0}</strong></div>
             <div style={funnelRow}><span>Personal Network profiles</span><strong>{num(billing?.personal_profiles)}</strong></div>
             <div style={funnelRow}><span>Legacy memory contexts</span><strong>{num(billing?.memory_contexts)}</strong></div>
-            <p className="muted" style={{ marginBottom: 0 }}>Account learning: remember/consent → updatePersonalNetwork / saveUserContext; preference questions → getPersonalNetwork / getUserContext. Compare Me To Me stays off until persistence is verified.</p>
+            <p className="muted" style={{ marginBottom: 0 }}>Account learning: instructions lead with MUST retrieve → getPersonalNetwork; remember/consent → updatePersonalNetwork / saveUserContext. Compare Me To Me stays off until persistence is verified.</p>
           </div>
         </section>
 
