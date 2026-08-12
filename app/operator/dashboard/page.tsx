@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 type Owner = { id: string; method: string; email?: string; phone?: string; wallet?: string };
 type GPT = {
@@ -12,6 +12,39 @@ type GPT = {
   config?: Record<string, unknown>;
   updated_at: string;
 };
+type BillingOverview = {
+  credit_model?: {
+    credits_per_pack: number;
+    metered_personal_cost: number;
+    metered_memory_cost: number;
+    report_cost: number;
+  };
+  stripe?: {
+    secret_configured: boolean;
+    credit_price_configured: boolean;
+    subscription_price_configured: boolean;
+    webhook_configured: boolean;
+  };
+  accounts_with_balance?: number;
+  total_credit_balance?: number;
+  lifetime_purchased?: number;
+  lifetime_spent?: number;
+  premium_entitlements_active?: number;
+  billing_accounts?: number;
+  personal_profiles?: number;
+  memory_contexts?: number;
+  usage_by_action_30d?: Array<{ action: string; events: number; credits_spent: number }>;
+  recent_credit_ledger?: Array<{
+    id: number;
+    user_id: string;
+    delta: number;
+    balance_after: number;
+    reason: string;
+    action: string | null;
+    created_at: string;
+  }>;
+  revenue_mapping?: string;
+};
 type OpsOverview = {
   ok: boolean;
   database_configured?: boolean;
@@ -22,6 +55,7 @@ type OpsOverview = {
   accounts?: { auth_users: number; oauth_users: number; active_oauth_tokens: number };
   portfolio?: { active_gpts: number; draft_gpts: number; public_gpts: number; action_gpts: number; amazon_linked_gpts: number };
   commerce?: { amazon: Record<string, unknown> | null };
+  billing?: BillingOverview;
   projects?: Array<{ id: number; slug: string; name: string; repository: string | null; status: string; updated_at: string }>;
   recent_runs?: Array<{ id: number; model: string | null; authority: number; status: string; closure_state: string | null; error: string | null; created_at: string }>;
   recent_signals?: Array<{ id: number; source: string; kind: string; status: string; requested_authority: number; created_at: string }>;
@@ -88,9 +122,16 @@ export default function OperatorBusinessDashboard() {
   const amazon = data?.commerce?.amazon || null;
   const portfolio = data?.portfolio;
   const accounts = data?.accounts;
+  const billing = data?.billing;
+  const stripe = billing?.stripe;
+  const creditModel = billing?.credit_model;
   const gpts = data?.gpts || [];
   const publicGpts = useMemo(() => gpts.filter((g) => g.config?.visibility === "public"), [gpts]);
   const businessHealth = error ? "Needs attention" : data?.database_configured ? "Operational" : "Waiting for data";
+  const premiumConfigured = Boolean(stripe?.subscription_price_configured);
+  const oauthUsers = accounts?.oauth_users || 0;
+  const premiumActive = billing?.premium_entitlements_active || 0;
+  const freePlanUsers = Math.max(oauthUsers - premiumActive, 0);
 
   return (
     <main style={{ maxWidth: 1240, margin: "0 auto", paddingBottom: 60 }}>
@@ -123,8 +164,55 @@ export default function OperatorBusinessDashboard() {
         <section style={grid4}>
           <Metric label="GPT portfolio" value={data.counts?.gpts} note={`${portfolio?.active_gpts || 0} active · ${portfolio?.public_gpts || 0} public`} />
           <Metric label="Accounts" value={accounts?.auth_users} note={`${accounts?.oauth_users || 0} GPT OAuth linked`} />
-          <Metric label="Amazon clicks · 30d" value={amazon?.clicks} note={`${num(amazon?.ordered_items)} orders · ${text(amazon?.conversion_rate, "0")}% conversion`} />
-          <Metric label="Affiliate earnings · 30d" value={money(amazon?.earnings_usd)} note={`${money(amazon?.ordered_revenue_usd)} ordered revenue`} raw />
+          <Metric label="Credit balance · total" value={billing?.total_credit_balance} note={`${num(billing?.accounts_with_balance)} accounts with balance`} />
+          <Metric label="Credits spent · lifetime" value={billing?.lifetime_spent} note={`${num(billing?.lifetime_purchased)} purchased`} />
+        </section>
+
+        <h2 style={sectionTitle}>Credits, plan & persistence revenue</h2>
+        <section style={grid4}>
+          <Metric label="Pack size" value={creditModel?.credits_per_pack ?? 100} note="createCreditCheckoutSession" />
+          <Metric label="Metered Action cost" value={creditModel?.metered_personal_cost ?? 1} note={`memory ${creditModel?.metered_memory_cost ?? 1} · report ${creditModel?.report_cost ?? 5}`} />
+          <Metric label="Free-plan OAuth users" value={freePlanUsers} note={`${premiumActive} premium entitlement${premiumActive === 1 ? "" : "s"} active`} />
+          <Metric label="Stored profiles" value={billing?.personal_profiles} note={`${num(billing?.memory_contexts)} legacy memory contexts`} />
+        </section>
+
+        <section style={{ ...grid2, marginTop: 16 }}>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Plan & Stripe wiring</h2>
+            <div style={funnelRow}><span>Active paid path</span><strong>Credits (packs of {creditModel?.credits_per_pack ?? 100})</strong></div>
+            <div style={funnelRow}><span>Credit price configured</span><strong>{stripe?.credit_price_configured ? "yes" : "no"}</strong></div>
+            <div style={funnelRow}><span>Webhook configured</span><strong>{stripe?.webhook_configured ? "yes" : "no"}</strong></div>
+            <div style={funnelRow}><span>Secret configured</span><strong>{stripe?.secret_configured ? "yes" : "no"}</strong></div>
+            <div style={funnelRow}>
+              <span>Premium subscription</span>
+              <strong>{premiumConfigured ? "env configured" : "not configured"}</strong>
+            </div>
+            <div style={funnelRow}><span>Billing accounts</span><strong>{num(billing?.billing_accounts)}</strong></div>
+            {!premiumConfigured && (
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Premium subscription checkout is disabled until <code>STRIPE_PRICE_ID_PREMIUM</code> is set. Do not advertise premium as available. Paid persistence maps to credit spend only.
+              </p>
+            )}
+            {premiumConfigured && (
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Premium rows count only verified Stripe subscription entitlements. Credits remain the meter for Personal Network / memory Actions.
+              </p>
+            )}
+          </div>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Metered Action usage · 30d</h2>
+            {!billing?.usage_by_action_30d?.length ? (
+              <p className="muted">No credit ledger usage in the last 30 days yet.</p>
+            ) : (
+              billing.usage_by_action_30d.map((row) => (
+                <div key={row.action} style={funnelRow}>
+                  <span><code>{row.action}</code> · {num(row.events)} events</span>
+                  <strong>{num(row.credits_spent)} credits</strong>
+                </div>
+              ))
+            )}
+            <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>{billing?.revenue_mapping || "Paid persistence consumes credits after verified Stripe purchase."}</p>
+          </div>
         </section>
 
         <section style={{ ...grid2, marginTop: 16 }}>
@@ -135,17 +223,50 @@ export default function OperatorBusinessDashboard() {
             <div style={funnelRow}><span>30-day affiliate clicks</span><strong>{num(amazon?.clicks)}</strong></div>
             <div style={funnelRow}><span>Ordered items</span><strong>{num(amazon?.ordered_items)}</strong></div>
             <div style={funnelRow}><span>Affiliate earnings</span><strong>{money(amazon?.earnings_usd)}</strong></div>
-            <p className="muted" style={{ marginBottom: 0 }}>Amazon snapshot: {amazon ? `${text(amazon.period_start)} → ${text(amazon.period_end)}` : "not stored yet"}. Current product-link fallback remains the supported path.</p>
+            <p className="muted" style={{ marginBottom: 0 }}>Amazon snapshot: {amazon ? `${text(amazon.period_start)} → ${text(amazon.period_end)}` : "not stored yet"}. Tagged searchProduct fallback remains the supported Creators workaround.</p>
           </div>
           <div className="card">
-            <h2 style={{ marginTop: 0 }}>Accounts & retention foundation</h2>
+            <h2 style={{ marginTop: 0 }}>Account learning foundation</h2>
             <div style={funnelRow}><span>Supabase auth users</span><strong>{accounts?.auth_users || 0}</strong></div>
             <div style={funnelRow}><span>GPT OAuth users</span><strong>{accounts?.oauth_users || 0}</strong></div>
             <div style={funnelRow}><span>Active OAuth tokens</span><strong>{accounts?.active_oauth_tokens || 0}</strong></div>
-            <div style={funnelRow}><span>GPTs with Actions</span><strong>{portfolio?.action_gpts || 0}</strong></div>
-            <p className="muted" style={{ marginBottom: 0 }}>Next product layer: consented Personal Network → Compare Me to Me → paid persistent analysis.</p>
+            <div style={funnelRow}><span>Personal Network profiles</span><strong>{num(billing?.personal_profiles)}</strong></div>
+            <div style={funnelRow}><span>Legacy memory contexts</span><strong>{num(billing?.memory_contexts)}</strong></div>
+            <p className="muted" style={{ marginBottom: 0 }}>Account learning: remember/consent → updatePersonalNetwork / saveUserContext; preference questions → getPersonalNetwork / getUserContext. Compare Me To Me stays off until persistence is verified.</p>
           </div>
         </section>
+
+        {!!billing?.recent_credit_ledger?.length && (
+          <section className="card" style={{ marginTop: 16 }}>
+            <h2 style={{ marginTop: 0 }}>Recent credit ledger</h2>
+            <div className="tableWrap">
+              <table className="opsTable">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>User</th>
+                    <th>Reason</th>
+                    <th>Action</th>
+                    <th>Delta</th>
+                    <th>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billing.recent_credit_ledger.map((row) => (
+                    <tr key={row.id}>
+                      <td>{when(row.created_at)}</td>
+                      <td><code>{row.user_id}</code></td>
+                      <td>{row.reason}</td>
+                      <td>{text(row.action)}</td>
+                      <td>{row.delta}</td>
+                      <td>{row.balance_after}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <h2 style={sectionTitle}>GPT portfolio</h2>
         <section className="card">
@@ -173,8 +294,20 @@ export default function OperatorBusinessDashboard() {
         <section style={grid4}>
           <Status label="Database" state={data.database_configured ? "Connected" : "Not configured"} ok={Boolean(data.database_configured)} />
           <Status label="Owner auth" state={owner ? "Google session active" : "Not signed in"} ok={Boolean(owner)} />
-          <Status label="Amazon" state={amazon ? "Snapshot stored" : "No snapshot"} ok={Boolean(amazon)} />
-          <Status label="Approvals" state={data.counts?.approvals_pending ? `${data.counts.approvals_pending} pending` : "Clear"} ok={!data.counts?.approvals_pending} />
+          <Status
+            label="Credit checkout"
+            state={
+              stripe?.secret_configured && stripe?.credit_price_configured && stripe?.webhook_configured
+                ? "Secret + price + webhook"
+                : "Incomplete"
+            }
+            ok={Boolean(stripe?.secret_configured && stripe?.credit_price_configured && stripe?.webhook_configured)}
+          />
+          <Status
+            label="Premium subscription"
+            state={premiumConfigured ? "Price configured" : "Not configured — credits only"}
+            ok={premiumConfigured}
+          />
         </section>
 
         <section className="card" style={{ marginTop: 16 }}><h2 style={{ marginTop: 0 }}>Projects & infrastructure references</h2>{data.projects?.map((p) => <div key={p.id} style={activity}><div><strong>{p.name}</strong><div className="muted">{p.repository || "No repository"} · {p.slug}</div></div><span style={pill}>{p.status}</span></div>)}<div style={{ marginTop: 14 }}>{Object.entries(data.external_metrics || {}).map(([key, value]) => <div key={key} className="muted" style={{ marginTop: 6 }}><strong>{key.replaceAll("_", " ")}:</strong> {value.status} — {value.note}</div>)}</div></section>
@@ -191,13 +324,13 @@ function Metric({ label, value, note, raw = false }: { label: string; value: unk
 function Mini({ label, value }: { label: string; value: unknown }) { return <div><div className="muted">{label}</div><strong style={{ fontSize: 24 }}>{num(value)}</strong></div>; }
 function Status({ label, state, ok }: { label: string; state: string; ok: boolean }) { return <div className="card"><div className="muted">{label}</div><div style={{ fontWeight: 700, marginTop: 8 }}>{state}</div><div style={{ ...pill, marginTop: 10, display: "inline-block", background: ok ? "#ecfdf3" : "#fff7ed", color: ok ? "#067647" : "#b54708" }}>{ok ? "OK" : "Check"}</div></div>; }
 
-const sectionTitle: React.CSSProperties = { marginTop: 30, marginBottom: 12, fontSize: 22 };
-const grid4: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12 };
-const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12 };
-const funnelRow: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 20, padding: "10px 0", borderBottom: "1px solid #eee" };
-const activity: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, padding: "11px 0", borderBottom: "1px solid #eee", alignItems: "flex-start" };
-const pill: React.CSSProperties = { borderRadius: 999, padding: "6px 10px", fontSize: 13, fontWeight: 650, background: "#f2f4f7" };
-const button: React.CSSProperties = { padding: "10px 14px", border: "1px solid #111", borderRadius: 8, background: "#111", color: "#fff", cursor: "pointer" };
-const secondaryButton: React.CSSProperties = { ...button, background: "white", color: "#111" };
-const linkButton: React.CSSProperties = { ...button, textDecoration: "none", display: "inline-block" };
-const input: React.CSSProperties = { flex: 1, minWidth: 220, padding: "10px 12px", border: "1px solid #bbb", borderRadius: 8 };
+const sectionTitle: CSSProperties = { marginTop: 30, marginBottom: 12, fontSize: 22 };
+const grid4: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12 };
+const grid2: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12 };
+const funnelRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 20, padding: "10px 0", borderBottom: "1px solid #eee" };
+const activity: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, padding: "11px 0", borderBottom: "1px solid #eee", alignItems: "flex-start" };
+const pill: CSSProperties = { borderRadius: 999, padding: "6px 10px", fontSize: 13, fontWeight: 650, background: "#f2f4f7" };
+const button: CSSProperties = { padding: "10px 14px", border: "1px solid #111", borderRadius: 8, background: "#111", color: "#fff", cursor: "pointer" };
+const secondaryButton: CSSProperties = { ...button, background: "white", color: "#111" };
+const linkButton: CSSProperties = { ...button, textDecoration: "none", display: "inline-block" };
+const input: CSSProperties = { flex: 1, minWidth: 220, padding: "10px 12px", border: "1px solid #bbb", borderRadius: 8 };

@@ -2,7 +2,7 @@
 
 ## Current model
 
-Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.4.0 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations.
+Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.5.0 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations. Premium subscription checkout stays disabled until `STRIPE_PRICE_ID_PREMIUM` is set — do not advertise premium as available in that case.
 
 ## Action classifications
 - `searchProduct` — **FREE**. Product/affiliate acquisition path.
@@ -54,13 +54,17 @@ Never collect raw card data in chat or GitHub, never store Stripe secrets in the
 
 ## Custom GPT schema
 
-The deployed OpenAPI v2.4.0 billing/persistence operations are:
-- `getEntitlements` — PAYMENT-INFRASTRUCTURE
+The deployed OpenAPI v2.5.0 billing/persistence operations are:
+- `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs, `subscription_available`)
 - `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE
-- `getPersonalNetwork` — PAID
-- `updatePersonalNetwork` — PAID
+- `getPersonalNetwork` — PAID (required for preference/memory questions)
+- `updatePersonalNetwork` — PAID (required on explicit remember/consent)
 - `getUserContext` — PAID
 - `saveUserContext` — PAID
 - `deleteUserContext` — ACCOUNT/SECURITY
 
-If the Custom GPT still has an older schema containing `createCheckoutSession` or `createBillingPortalSession`, re-import `https://ratemyface.vercel.app/api/openapi` before relying on the current credit flow.
+If the Custom GPT still has an older schema containing `createCheckoutSession` or `createBillingPortalSession`, re-import `https://ratemyface.vercel.app/api/openapi` before relying on the current credit flow. Also re-paste `GPT_INSTRUCTIONS.md` so account-learning Action selection stays forced.
+
+## Operator dashboard
+
+`/operator/dashboard` (via `/api/operator/ops`) surfaces credit balances, pack size, metered costs, free vs premium entitlement counts, 30-day credit usage by Action, personal-profile / memory-context counts, and Stripe wiring flags. Premium is labeled “not configured” when `stripe_subscription_price_configured=false`.

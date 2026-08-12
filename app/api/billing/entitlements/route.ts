@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { databaseConfigured } from "../../../../lib/db";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
-import { getEntitlements } from "../../../../lib/stripeBilling";
+import {
+  MEMORY_CONTEXT_COST,
+  creditsPerPack,
+  getEntitlements,
+  stripeCreditsPriceConfigured,
+  stripePriceConfigured,
+  stripeSecretConfigured,
+  stripeWebhookConfigured
+} from "../../../../lib/stripeBilling";
+import { PERSONAL_ACTION_COST, REPORT_ACTION_COST } from "../../../../lib/personalNetwork";
 
 export const runtime = "nodejs";
 
@@ -15,9 +24,24 @@ export async function GET(request: NextRequest) {
   }
 
   const entitlements = await getEntitlements(user.id);
+  const subscriptionAvailable = stripeSecretConfigured() && stripePriceConfigured();
+  const creditCheckoutAvailable = stripeSecretConfigured() && stripeCreditsPriceConfigured() && stripeWebhookConfigured();
+
   return NextResponse.json({
     ok: true,
     plan: entitlements.premium ? "premium" : "free",
-    ...entitlements
+    ...entitlements,
+    credit_pack_size: creditsPerPack(),
+    metered_costs: {
+      personal_network: PERSONAL_ACTION_COST,
+      memory_context: MEMORY_CONTEXT_COST,
+      report: REPORT_ACTION_COST
+    },
+    credit_checkout_available: creditCheckoutAvailable,
+    subscription_available: subscriptionAvailable,
+    checkout_action: "createCreditCheckoutSession",
+    note: subscriptionAvailable
+      ? "Credits meter paid persistence Actions. Premium subscription is also configured."
+      : "Credits meter paid persistence Actions. Premium subscription checkout is not configured (STRIPE_PRICE_ID_PREMIUM unset)."
   });
 }

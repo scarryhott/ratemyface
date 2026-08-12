@@ -28,6 +28,11 @@ export async function GET() {
       credits_per_pack: 100,
       metered_memory_cost: 1
     },
+    compare_me_to_me: {
+      enabled: false,
+      status: "requires_account_learning",
+      note: "Scaffold only. Ship after consented Personal Network read/write is verified in production."
+    },
     partner_tag: "ratemyfacegpt-20"
   });
 }
