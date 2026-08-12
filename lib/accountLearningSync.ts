@@ -105,6 +105,13 @@ export async function clearAccountLearningStores(userId: string) {
   await ensureMemorySchema();
   await ensurePersonalNetworkSchema();
   const sql = db();
+  await sql`delete from rmf_personal_recommendations where user_id = ${userId}`;
+  await sql`delete from rmf_interactions where user_id = ${userId}`;
+  try {
+    await sql`delete from rmf_compare_jobs where user_id = ${userId}`;
+  } catch {
+    // Compare tables are optional while the feature stays DISABLED.
+  }
   await sql`delete from rmf_users where id = ${userId}`;
   await sql`delete from rmf_personal_profiles where user_id = ${userId}`;
 }

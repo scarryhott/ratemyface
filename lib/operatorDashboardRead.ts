@@ -67,6 +67,7 @@ export type DashboardV2 = {
     learning: {
       profiles_created: MetricValue;
       interactions_stored: MetricValue;
+      recommendations_stored: MetricValue;
       compare_jobs: MetricValue;
       social_connections: MetricValue;
     };
@@ -243,6 +244,7 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       learning: {
         profiles_created: unavailable("Database not configured"),
         interactions_stored: unavailable("Database not configured"),
+        recommendations_stored: unavailable("Database not configured"),
         compare_jobs: metric(0, "Compare Me To Me DISABLED — no live jobs"),
         social_connections: unavailable("Database not configured")
       }
@@ -289,7 +291,7 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
         "rmf_personal_recommendations"
       ],
       admin_note:
-        "Admin drill-down (user → preferences, goals, history, feedback, recommendations) expands in PR #21 Learning Console."
+        "Paid Personal Network writes persist rmf_interactions and derive rmf_personal_recommendations when a product URL/title is present. Counts are live table rows (0 if empty) — never invented. Admin drill-down expands in PR #21 Learning Console."
     },
     compare_me_to_me: {
       status: COMPARE_ME_TO_ME.dashboard_status,
@@ -708,6 +710,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         learning: {
           profiles_created: profilesCreated,
           interactions_stored: interactionsStored,
+          recommendations_stored: recommendations,
           compare_jobs: hasCompareJobs
             ? compareCompleted
             : metric(0, "Compare Me To Me DISABLED — jobs table not applied"),
@@ -765,7 +768,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           "rmf_personal_recommendations"
         ],
         admin_note:
-          "Admin user drill-down (preferences, goals, history, feedback, recommendations) ships in PR #21. Signup bootstrap credits=" +
+          "Paid Personal Network writes persist rmf_interactions and derive rmf_personal_recommendations when a product URL/title is present. Counts are live table rows (0 if empty) — never invented. Admin user drill-down ships in PR #21. Signup bootstrap credits=" +
           String(signupCredits()) +
           "."
       },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { databaseConfigured, db, ensureMemorySchema } from "../../../../lib/db";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 import { consumeCredits, creditBalance, ensureSignupCreditGrant, MEMORY_CONTEXT_COST } from "../../../../lib/stripeBilling";
+import { recordLearningWrite } from "../../../../lib/accountLearningPipeline";
 import {
   clearAccountLearningStores,
   readContextUnified,
@@ -27,7 +28,20 @@ export async function POST(request: NextRequest) {
   await sql`insert into rmf_users (id, consent_personalization, updated_at) values (${user.id}, true, now()) on conflict (id) do update set consent_personalization = true, updated_at = now()`;
   await sql`insert into rmf_user_context (user_id, context, updated_at) values (${user.id}, ${sql.json(context)}, now()) on conflict (user_id) do update set context = excluded.context, updated_at = now()`;
   await syncLegacyContextToPersonal(user.id, context as Record<string, unknown>);
-  return NextResponse.json({ ok: true, saved: true, credits_remaining: await creditBalance(user.id), credits_charged: MEMORY_CONTEXT_COST });
+  const pipeline = await recordLearningWrite({
+    userId: user.id,
+    kind: "preference",
+    data: context as Record<string, unknown>,
+    requireMeaningfulPreference: true
+  });
+  return NextResponse.json({
+    ok: true,
+    saved: true,
+    credits_remaining: await creditBalance(user.id),
+    credits_charged: MEMORY_CONTEXT_COST,
+    interaction_id: pipeline.interaction?.id ?? null,
+    recommendation_id: pipeline.recommendation?.id ?? null
+  });
 }
 
 export async function GET(request: NextRequest) {

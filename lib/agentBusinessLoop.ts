@@ -10,6 +10,7 @@ export type BusinessMetricsSnapshot = {
   oauth_users: number | null;
   personal_profiles: number | null;
   interactions: number | null;
+  personal_recommendations: number | null;
   credit_balance_total: number | null;
   lifetime_purchased: number | null;
   lifetime_spent: number | null;
@@ -72,6 +73,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     oauth_users: null,
     personal_profiles: null,
     interactions: null,
+    personal_recommendations: null,
     credit_balance_total: null,
     lifetime_purchased: null,
     lifetime_spent: null,
@@ -121,6 +123,11 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     base.interactions = asNumber(rows[0]?.total);
   } else notes.push("rmf_interactions missing");
 
+  if (await tableExists(sql, "rmf_personal_recommendations")) {
+    const rows = await sql`select count(*)::int as total from rmf_personal_recommendations`;
+    base.personal_recommendations = asNumber(rows[0]?.total);
+  } else notes.push("rmf_personal_recommendations missing");
+
   if (await tableExists(sql, "rmf_credit_accounts")) {
     const rows = await sql`
       select coalesce(sum(balance),0)::bigint as balance,
@@ -153,6 +160,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
   }
 
   notes.push("ChatGPT chat counts and Amazon Associates live revenue are not ingested — leave Unavailable rather than inventing.");
+  notes.push("Account Learning pipeline writes rmf_interactions and derives rmf_personal_recommendations on paid Personal Network saves.");
   notes.push("Compare Me To Me remains disabled until image storage + consent + history exist.");
   return base;
 }

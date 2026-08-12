@@ -29,6 +29,7 @@ type BusinessOverview = {
   learning: {
     profiles_created: MetricValue;
     interactions_stored: MetricValue;
+    recommendations_stored: MetricValue;
     compare_jobs: MetricValue;
     social_connections: MetricValue;
   };
@@ -85,6 +86,7 @@ export function BusinessOverviewSection({ data }: { data: BusinessOverview }) {
       <section style={grid4}>
         <MetricCard label="Profiles created" metric={data.learning.profiles_created} />
         <MetricCard label="Interactions stored" metric={data.learning.interactions_stored} />
+        <MetricCard label="Recommendations stored" metric={data.learning.recommendations_stored} />
         <MetricCard label="Compare jobs" metric={data.learning.compare_jobs} />
         <MetricCard label="Social connections" metric={data.learning.social_connections} />
       </section>
