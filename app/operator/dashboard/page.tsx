@@ -18,6 +18,7 @@ type BillingOverview = {
     metered_personal_cost: number;
     metered_memory_cost: number;
     report_cost: number;
+    signup_credits?: number;
     label?: string;
   };
   stripe?: {
@@ -45,6 +46,23 @@ type BillingOverview = {
     created_at: string;
   }>;
   revenue_mapping?: string;
+};
+type CreditAccount = {
+  user_id: string;
+  balance: number;
+  lifetime_purchased: number;
+  lifetime_spent: number;
+  updated_at?: string | null;
+  label?: string;
+  recent_ledger?: Array<{
+    id: number;
+    delta: number;
+    balance_after: number;
+    reason: string;
+    action: string | null;
+    external_ref?: string | null;
+    created_at: string;
+  }>;
 };
 type InfrastructureBoundary = {
   vercel_hosting?: { plan: string; status: string; payment_methods: string; note: string };
@@ -106,6 +124,12 @@ export default function OperatorBusinessDashboard() {
   const [data, setData] = useState<OpsOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [creditUserId, setCreditUserId] = useState("");
+  const [creditAmount, setCreditAmount] = useState("100");
+  const [creditNote, setCreditNote] = useState("");
+  const [creditLookup, setCreditLookup] = useState<CreditAccount | null>(null);
+  const [creditBusy, setCreditBusy] = useState(false);
+  const [creditMessage, setCreditMessage] = useState("");
 
   async function loadOwner() {
     const response = await fetch("/api/operator/owner", { cache: "no-store", credentials: "same-origin" });
@@ -128,6 +152,55 @@ export default function OperatorBusinessDashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally { setLoading(false); }
+  }
+
+  function authHeaders() {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (secret) headers.set("Authorization", `Bearer ${secret}`);
+    return headers;
+  }
+
+  async function lookupCredits() {
+    const userId = creditUserId.trim();
+    if (!userId) { setCreditMessage("Enter a user_id (OAuth subject)."); return; }
+    setCreditBusy(true); setCreditMessage("");
+    try {
+      const response = await fetch(`/api/operator/credits?user_id=${encodeURIComponent(userId)}`, {
+        headers: authHeaders(),
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP_${response.status}`);
+      setCreditLookup(body.account as CreditAccount);
+      setCreditMessage(`Balance ${body.account?.balance ?? 0} · ${body.product_credits_label || "Stripe RMF product credits"}`);
+    } catch (err) {
+      setCreditLookup(null);
+      setCreditMessage(err instanceof Error ? err.message : String(err));
+    } finally { setCreditBusy(false); }
+  }
+
+  async function grantCreditsToUser() {
+    const userId = creditUserId.trim();
+    const amount = Number.parseInt(creditAmount, 10);
+    if (!userId) { setCreditMessage("Enter a user_id (OAuth subject)."); return; }
+    if (!Number.isInteger(amount) || amount <= 0) { setCreditMessage("Amount must be a positive integer."); return; }
+    setCreditBusy(true); setCreditMessage("");
+    try {
+      const response = await fetch("/api/operator/credits", {
+        method: "POST",
+        headers: authHeaders(),
+        credentials: "same-origin",
+        body: JSON.stringify({ user_id: userId, amount, note: creditNote.trim() || undefined })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP_${response.status}`);
+      setCreditLookup(body.account as CreditAccount);
+      setCreditMessage(`Granted ${amount} via grantCredits. Balance ${body.account?.balance ?? body.balance ?? 0} (Stripe RMF product ledger — not Vercel).`);
+      await loadOps();
+    } catch (err) {
+      setCreditMessage(err instanceof Error ? err.message : String(err));
+    } finally { setCreditBusy(false); }
   }
 
   useEffect(() => { void (async () => { const current = await loadOwner(); if (current) await loadOps(""); })(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -196,11 +269,82 @@ export default function OperatorBusinessDashboard() {
           {productCreditLabel}. Managed here and by GPT Actions (<code>getEntitlements</code> / <code>createCreditCheckoutSession</code>).
           Do not confuse with Vercel Hobby quotas or Vercel AI Gateway USD.
         </p>
-        <section style={grid4}>
+        <section style={{ ...grid4 }}>
           <Metric label="Pack size" value={creditModel?.credits_per_pack ?? 100} note="createCreditCheckoutSession" />
           <Metric label="Metered Action cost" value={creditModel?.metered_personal_cost ?? 1} note={`memory ${creditModel?.metered_memory_cost ?? 1} · report ${creditModel?.report_cost ?? 5}`} />
-          <Metric label="Free-plan OAuth users" value={freePlanUsers} note={`${premiumActive} premium entitlement${premiumActive === 1 ? "" : "s"} active`} />
+          <Metric label="Optional signup grant" value={creditModel?.signup_credits ?? 100} note={(creditModel?.signup_credits ?? 100) > 0 ? "RMF_SIGNUP_CREDITS → grantCredits once" : "Disabled (RMF_SIGNUP_CREDITS=0)"} />
           <Metric label="Stored profiles" value={billing?.personal_profiles} note={`${num(billing?.memory_contexts)} legacy memory contexts`} />
+        </section>
+
+        <section className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Founder grant — product credits (Stripe ledger)</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Preferred test path: look up an OAuth <code>user_id</code>, then grant into the same <code>grantCredits</code> / <code>rmf_credit_ledger</code> used by checkout webhooks and Action metering.
+            Not Vercel Hobby / AI Gateway. Optional first-OAuth signup grant is {creditModel?.signup_credits ?? 100} when enabled (<code>RMF_SIGNUP_CREDITS</code>; set <code>0</code> to disable).
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <input
+              style={{ ...input, minWidth: 280 }}
+              placeholder="OAuth user_id"
+              value={creditUserId}
+              onChange={(e) => setCreditUserId(e.target.value)}
+            />
+            <input
+              style={{ ...input, minWidth: 120, flex: "0 0 120px" }}
+              placeholder="Amount"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+            />
+            <input
+              style={input}
+              placeholder="Note (optional)"
+              value={creditNote}
+              onChange={(e) => setCreditNote(e.target.value)}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={secondaryButton} disabled={creditBusy || (!owner && !secret)} onClick={() => void lookupCredits()}>
+              {creditBusy ? "Working…" : "Show balance"}
+            </button>
+            <button style={button} disabled={creditBusy || (!owner && !secret)} onClick={() => void grantCreditsToUser()}>
+              Grant credits
+            </button>
+          </div>
+          {creditMessage && <p style={{ marginBottom: 0, marginTop: 12 }}>{creditMessage}</p>}
+          {creditLookup && (
+            <div style={{ marginTop: 14 }}>
+              <div style={funnelRow}><span>User</span><strong><code>{creditLookup.user_id}</code></strong></div>
+              <div style={funnelRow}><span>Current Stripe RMF balance</span><strong>{num(creditLookup.balance)}</strong></div>
+              <div style={funnelRow}><span>Lifetime purchased</span><strong>{num(creditLookup.lifetime_purchased)}</strong></div>
+              <div style={funnelRow}><span>Lifetime spent</span><strong>{num(creditLookup.lifetime_spent)}</strong></div>
+              {!!creditLookup.recent_ledger?.length && (
+                <div className="tableWrap" style={{ marginTop: 12 }}>
+                  <table className="opsTable">
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>Reason</th>
+                        <th>Action</th>
+                        <th>Delta</th>
+                        <th>Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creditLookup.recent_ledger.map((row) => (
+                        <tr key={row.id}>
+                          <td>{when(row.created_at)}</td>
+                          <td>{row.reason}</td>
+                          <td>{text(row.action)}</td>
+                          <td>{row.delta}</td>
+                          <td>{row.balance_after}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <section style={{ ...grid2, marginTop: 16 }}>
@@ -215,6 +359,7 @@ export default function OperatorBusinessDashboard() {
               <strong>{premiumConfigured ? "env configured" : "not configured"}</strong>
             </div>
             <div style={funnelRow}><span>Billing accounts</span><strong>{num(billing?.billing_accounts)}</strong></div>
+            <div style={funnelRow}><span>Free-plan OAuth users</span><strong>{num(freePlanUsers)} · {premiumActive} premium</strong></div>
             {!premiumConfigured && (
               <p className="muted" style={{ marginBottom: 0 }}>
                 Premium subscription checkout is disabled until <code>STRIPE_PRICE_ID_PREMIUM</code> is set. Do not advertise premium as available. Paid persistence maps to Stripe RMF credit spend only.

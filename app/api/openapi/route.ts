@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       title: "Rate My Face Actions API",
       version: "2.5.1",
       description:
-        "Rate My Face Actions: FREE product links plus Stripe-credit-metered account learning. Ordinary chat is not storage. Explicit remember/consent → write Actions (updatePersonalNetwork / saveUserContext). Preference questions → read Actions (getPersonalNetwork / getUserContext). Paid Actions return HTTP 402 credits_required when balance is insufficient; then use createCreditCheckoutSession. Never invent saved preferences from ChatGPT Memory."
+        "Rate My Face Actions: FREE product links plus Stripe-credit-metered account learning (founder/signup grantCredits bootstrap). Ordinary chat is not storage. Explicit remember/consent → write Actions. Preference questions → read Actions. On 402 credits_required use createCreditCheckoutSession. Never invent prefs from ChatGPT Memory."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
           operationId: "getEntitlements",
           summary: "PAYMENT-INFRASTRUCTURE — get plan, entitlements, and credit balance",
           description:
-            "Returns plan (free|premium), credit balance, pack size, metered costs, and whether premium subscription checkout is configured. Call before paid Actions when balance/access is uncertain. Do not invent premium access.",
+            "Returns plan (free|premium), credit balance, pack size, signup_bootstrap_credits, metered costs, and whether premium subscription checkout is configured. Call before paid Actions when balance/access is uncertain. Do not invent premium access.",
           responses: { "200": { description: "Access, plan, and balance" } }
         }
       },

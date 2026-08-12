@@ -2,6 +2,7 @@ import { databaseConfigured, db } from "./db";
 import {
   MEMORY_CONTEXT_COST,
   creditsPerPack,
+  signupCredits,
   stripeCreditsPriceConfigured,
   stripePriceConfigured,
   stripeSecretConfigured,
@@ -30,6 +31,7 @@ async function readBillingOverview(tx: any) {
     metered_personal_cost: PERSONAL_ACTION_COST,
     metered_memory_cost: MEMORY_CONTEXT_COST,
     report_cost: REPORT_ACTION_COST,
+    signup_credits: signupCredits(),
     label: productCreditLabel()
   };
   const stripe = {
@@ -61,7 +63,7 @@ async function readBillingOverview(tx: any) {
       created_at: string;
     }>,
     revenue_mapping:
-      "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory=1, report=5); packs via createCreditCheckoutSession → webhook → rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
+      "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory=1, report=5); founder grantCredits on /operator/dashboard; optional signup_grant (RMF_SIGNUP_CREDITS, default 100); packs via createCreditCheckoutSession → webhook → same rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
   };
 
   const hasCredits = await tableExists(tx, "rmf_credit_accounts");
@@ -192,7 +194,7 @@ async function readBillingOverview(tx: any) {
     memory_contexts,
     usage_by_action_30d,
     recent_credit_ledger,
-    revenue_mapping: `PRODUCT ${productCreditLabel()}: persistence Actions consume ${PERSONAL_ACTION_COST} credit (report=${REPORT_ACTION_COST}); packs=${creditsPerPack()} via createCreditCheckoutSession → Stripe webhook → rmf_credit_ledger. Not Vercel Hobby / AI Gateway. ${premiumNote}`
+    revenue_mapping: `PRODUCT ${productCreditLabel()}: persistence Actions consume ${PERSONAL_ACTION_COST} credit (report=${REPORT_ACTION_COST}); founder grantCredits on dashboard; optional signup_grant=${signupCredits()}; packs=${creditsPerPack()} via createCreditCheckoutSession → Stripe webhook → same rmf_credit_ledger. Not Vercel Hobby / AI Gateway. ${premiumNote}`
   };
 }
 
@@ -218,12 +220,13 @@ export function infrastructureCreditBoundary() {
       system: "stripe_metered",
       label: productCreditLabel(),
       credits_per_pack: creditsPerPack(),
+      signup_credits: signupCredits(),
       metered_memory_cost: MEMORY_CONTEXT_COST,
       metered_personal_cost: PERSONAL_ACTION_COST,
       report_cost: REPORT_ACTION_COST,
       checkout_action: "createCreditCheckoutSession",
       entitlements: "free vs premium (premium only when STRIPE_PRICE_ID_PREMIUM + verified webhook)",
-      note: "Sole product business credit system managed by this dashboard and GPT Actions."
+      note: "Sole product business credit system: grantCredits / consumeCredits on rmf_credit_* . Founder grants + optional signup_grant + Stripe packs."
     },
     nodejs_runtime_note:
       "Vercel sidebar may show Node.js 20 warnings on projects — optional infra note only; unrelated to product credit packs."
@@ -237,6 +240,7 @@ function billingFromEnvOnly() {
       metered_personal_cost: PERSONAL_ACTION_COST,
       metered_memory_cost: MEMORY_CONTEXT_COST,
       report_cost: REPORT_ACTION_COST,
+      signup_credits: signupCredits(),
       label: productCreditLabel()
     },
     stripe: {
