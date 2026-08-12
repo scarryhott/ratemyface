@@ -371,7 +371,9 @@ export function AgentConsoleSection({
               <p className="muted" style={{ marginBottom: 0 }}>
                 Snapshot at report: users={text(latest.metrics_before.auth_users)} · oauth=
                 {text(latest.metrics_before.oauth_users)} · profiles=
-                {text(latest.metrics_before.personal_profiles)} · credits remaining=
+                {text(latest.metrics_before.personal_profiles)} · interactions=
+                {text(latest.metrics_before.interactions)} · recs=
+                {text(latest.metrics_before.personal_recommendations)} · credits remaining=
                 {text(latest.metrics_before.credit_balance_total)} · purchased=
                 {text(latest.metrics_before.lifetime_purchased)} · spent=
                 {text(latest.metrics_before.lifetime_spent)} · stripe events=

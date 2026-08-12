@@ -89,3 +89,15 @@ Append one concise entry per material experiment.
 - **Change made:** plans/checkins tables + RLS; gate module; 503 stubs; health + dashboard Appearance Agent section with not-LIVE callout; credits metering noted for future paid ops. Amazon untouched; social stays `not_configured`; Compare stays DISABLED.
 - **Rollback:** revert appearance-agent scaffold commits; drop `rmf_appearance_*` tables if applied.
 - **Next / monitor:** do not add OpenAPI Action or flip LIVE until learning + compare gates met; meter future paid ops via Stripe RMF credits.
+
+### 2026-08-12 — Interactions → personal recommendations (Compare stays DISABLED)
+- **Surface:** Vercel API + Personal Network + operator dashboard Learning section
+- **Hypothesis:** Persisting Account Learning writes into `rmf_interactions` and deriving `rmf_personal_recommendations` (linked by `source_interaction_id` when a product URL/title is present) will produce non-zero Learning counts without enabling Compare/Social/Appearance.
+- **Variant A:** n/a (production pipeline on existing paid Actions)
+- **Variant B:** n/a
+- **Metric:** after an authenticated `updatePersonalNetwork` `save_recommendation` (or `save_interaction` with `data.url`), both tables have a row; dashboard Learning interactions/recommendations are live counts; `/api/compare` stays 503; health `compare_me_to_me.enabled=false`.
+- **Evidence/source:** `lib/accountLearningPipeline.ts`, migration `20260812210000_rmf_personal_recommendations_source_interaction.sql`, `/api/personal` + `/api/memory/context` writers.
+- **Result:** pending deploy + one authenticated transcript.
+- **Change made:** paid profile/recommendation/feedback writes record interactions; product URL/title derives/upserts personal recommendations; optional `RMF_COMPARE_TEST_LINK=1` soft-links `rmf_compare_jobs.source_interaction_id` without flipping Compare LIVE. `searchProduct` remains free and does not write learning rows. No new OpenAPI Action.
+- **Rollback:** revert this pipeline commit; column `source_interaction_id` is nullable and unused if writers roll back.
+- **Next / monitor:** trigger save path → row in `rmf_interactions` → row in `rmf_personal_recommendations`; confirm `/api/compare` 503 and dashboard counts (or Unavailable if tables missing).

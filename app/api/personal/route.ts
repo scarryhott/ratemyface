@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentOAuthUser } from "../../../lib/supabaseAuth";
 import { consumeCredits, creditBalance, ensureSignupCreditGrant } from "../../../lib/stripeBilling";
-import { PERSONAL_ACTION_COST, REPORT_ACTION_COST, connections, history, recommendationFeedback, saveInteraction, saveRecommendation, savedItems, updateProfile } from "../../../lib/personalNetwork";
+import { PERSONAL_ACTION_COST, REPORT_ACTION_COST, connections, history, savedItems, updateProfile } from "../../../lib/personalNetwork";
+import { recordLearningWrite } from "../../../lib/accountLearningPipeline";
 import { readProfileUnified, syncPersonalProfileToLegacy } from "../../../lib/accountLearningSync";
 import { shapePersonalProfilePayload } from "../../../lib/accountLearningShape";
 
@@ -42,13 +43,25 @@ export async function POST(req:NextRequest){
   result=await updateProfile(u.id,b.profile&&typeof b.profile==="object"?b.profile:{});
   const doc=(result?.profile&&typeof result.profile==="object"?result.profile:b.profile)||{};
   await syncPersonalProfileToLegacy(u.id,doc as Record<string,unknown>);
+  const pipeline=await recordLearningWrite({userId:u.id,kind:"preference",data:doc as Record<string,unknown>,requireMeaningfulPreference:true});
   // Return shaped profile so a follow-up read is not required to see prefs.
-  result={...result, shaped:shapePersonalProfilePayload(result)};
-  console.info("[account-learning:updatePersonalNetwork]",{operation:op,found:true});
+  result={...result, shaped:shapePersonalProfilePayload(result), interaction:pipeline.interaction, recommendation:pipeline.recommendation};
+  console.info("[account-learning:updatePersonalNetwork]",{operation:op,found:true,interaction_id:pipeline.interaction?.id??null});
  }
- else if(op==="save_interaction")result=await saveInteraction(u.id,String(b.kind||"chat"),String(b.summary||"").slice(0,1000),b.data&&typeof b.data==="object"?b.data:{});
- else if(op==="save_recommendation")result=await saveRecommendation(u.id,{item_type:b.item_type,title:b.title,url:b.url,data:b.data});
- else if(op==="recommendation_feedback")result=await recommendationFeedback(u.id,Number(b.recommendation_id),String(b.feedback||"").slice(0,200));
+ else if(op==="save_interaction"){
+  const data=b.data&&typeof b.data==="object"?b.data:{};
+  const pipeline=await recordLearningWrite({userId:u.id,kind:String(b.kind||"chat"),summary:String(b.summary||"").slice(0,1000),data});
+  result={...pipeline.interaction, ...pipeline};
+ }
+ else if(op==="save_recommendation"){
+  const rec={item_type:b.item_type,title:b.title,url:b.url,data:b.data&&typeof b.data==="object"?b.data:{}};
+  const pipeline=await recordLearningWrite({userId:u.id,kind:"recommendation",summary:String(b.title||b.summary||"").slice(0,1000),data:{...rec.data,title:b.title,url:b.url,item_type:b.item_type},recommendation:rec});
+  result={...pipeline.recommendation, ...pipeline};
+ }
+ else if(op==="recommendation_feedback"){
+  const pipeline=await recordLearningWrite({userId:u.id,kind:"feedback",feedback:{recommendation_id:Number(b.recommendation_id),feedback:String(b.feedback||"").slice(0,200)}});
+  result={...pipeline.recommendation, ...pipeline};
+ }
  else return NextResponse.json({ok:false,error:"invalid_operation"},{status:400});
  return NextResponse.json({ok:true,operation:op,result,credits_charged:PERSONAL_ACTION_COST,credits_remaining:await creditBalance(u.id)});
 }

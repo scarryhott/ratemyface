@@ -60,7 +60,9 @@ export async function GET() {
     account_learning: {
       openapi_version: "2.5.3",
       profile_empty_shape: "found=false + preferences={}",
-      retrieve_action: "getPersonalNetwork"
+      retrieve_action: "getPersonalNetwork",
+      pipeline: "rmf_interactions → rmf_personal_recommendations",
+      compare_test_link: "opt-in RMF_COMPARE_TEST_LINK=1 only; /api/compare stays 503"
     },
     partner_tag: "ratemyfacegpt-20"
   });

@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           operationId: "updatePersonalNetwork",
           summary: "PAID/METERED — MUST call on explicit remember/consent (1 credit)",
           description:
-            "MUST call on explicit remember/save/store. Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Dual-writes legacy context. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1. On 402 do not claim saved.",
+            "MUST call on explicit remember/save/store. Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Dual-writes legacy context. Server also records rmf_interactions and derives rmf_personal_recommendations when url/title is present. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1. On 402 do not claim saved.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalWriteRequest" } } }
