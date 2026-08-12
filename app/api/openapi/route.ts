@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.1",
+      version: "2.5.2",
       description:
-        "Rate My Face Actions: FREE product links plus Stripe-credit-metered account learning (founder/signup grantCredits bootstrap). Ordinary chat is not storage. Explicit remember/consent → write Actions. Preference questions → read Actions. On 402 credits_required use createCreditCheckoutSession. Never invent prefs from ChatGPT Memory."
+        "FREE product links + credit-metered account learning. Ordinary chat is not storage. Remember/consent → MUST write Actions. Preference questions → MUST getPersonalNetwork then getUserContext if empty. Dual-write syncs stores. On 402 use checkout. Never invent prefs from ChatGPT Memory."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
       "/api/personal": {
         get: {
           operationId: "getPersonalNetwork",
-          summary: "PAID/METERED — REQUIRED for preference/memory questions (1 credit; report 5)",
+          summary: "PAID/METERED — MUST call first on preference/memory questions (1; report 5)",
           description:
-            "REQUIRED for preference/memory questions. Answer only from returned data. mode=profile (prefs); history/saved/connections/report as needed. Costs 1 credit (report=5). On 402 credits_required, do not invent prefs — offer createCreditCheckoutSession only if user wants credits.",
+            "MUST call on preference/memory questions (e.g. “What do you know about my preferences?”) before answering — natural language is enough. mode=profile first; if empty also call getUserContext. Falls back to legacy context when profile empty. Costs 1 (report=5). On 402 do not invent prefs.",
           parameters: [
             {
               name: "mode",
@@ -81,9 +81,9 @@ export async function GET(request: NextRequest) {
         },
         post: {
           operationId: "updatePersonalNetwork",
-          summary: "PAID/METERED — REQUIRED on explicit remember/consent (1 credit)",
+          summary: "PAID/METERED — MUST call on explicit remember/consent (1 credit)",
           description:
-            "REQUIRED on explicit remember/save/store (e.g. “Remember that I prefer…”). Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1 credit. On 402, do not claim save succeeded.",
+            "MUST call on explicit remember/save/store. Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Dual-writes legacy context. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1. On 402 do not claim saved.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalWriteRequest" } } }
@@ -100,9 +100,9 @@ export async function GET(request: NextRequest) {
       "/api/memory/context": {
         get: {
           operationId: "getUserContext",
-          summary: "PAID/METERED — legacy preference read (1 credit)",
+          summary: "PAID/METERED — MUST call if getPersonalNetwork profile empty (1)",
           description:
-            "Legacy persistent context read. Acceptable when the user asks what Rate My Face knows; prefer getPersonalNetwork mode=profile. Answer only from returned data. Costs 1 credit.",
+            "Legacy/mirror preference read. After getPersonalNetwork mode=profile returns empty/null, MUST call this in the same turn. Falls back to personal profile when legacy empty. Answer only from returned data. Costs 1 credit.",
           responses: {
             "200": { description: "Context" },
             "402": {
@@ -113,9 +113,9 @@ export async function GET(request: NextRequest) {
         },
         post: {
           operationId: "saveUserContext",
-          summary: "PAID/METERED — legacy remember/consent write (1 credit)",
+          summary: "PAID/METERED — legacy remember/consent write; mirrors profile (1)",
           description:
-            "Legacy write path for explicit remember/consent. Requires consent_personalization=true. Prefer updatePersonalNetwork update_profile for new account learning. Costs 1 credit. On 402, do not claim save succeeded.",
+            "Legacy write for explicit remember/consent. Requires consent_personalization=true. Prefer updatePersonalNetwork update_profile; if used, dual-writes Personal Network profile. Costs 1. On 402 do not claim saved.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/SaveUserContextRequest" } } }
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
         delete: {
           operationId: "deleteUserContext",
           summary: "ACCOUNT/SECURITY — delete stored Rate My Face context",
-          description: "Never paywalled. Deletes stored Rate My Face context for the authenticated user.",
+          description: "Never paywalled. Deletes legacy context and Personal Network profile for the authenticated user.",
           responses: { "200": { description: "Deleted" } }
         }
       }
