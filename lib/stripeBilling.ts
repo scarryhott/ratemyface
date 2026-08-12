@@ -335,6 +335,51 @@ export async function creditAccountOverview(userId: string) {
   };
 }
 
+/**
+ * Operator revoke / clawback of product credits into the same audited ledger.
+ * Writes reason=operator_revoke — never mutates balance without a ledger row.
+ */
+export async function revokeCredits(
+  userId: string,
+  amount: number,
+  externalRef: string,
+  metadata: Record<string, unknown> = {}
+): Promise<{ ok: boolean; balance: number }> {
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("invalid_credit_revoke");
+  await ensureBillingSchema();
+  const sql = db();
+
+  const existing = await sql`
+    select balance_after
+    from rmf_credit_ledger
+    where external_ref = ${externalRef}
+    limit 1
+  `;
+  if (existing.length) return { ok: true, balance: Number(existing[0].balance_after) };
+
+  const rows = await sql`
+    update rmf_credit_accounts
+    set balance = balance - ${amount},
+        updated_at = now()
+    where user_id = ${userId}
+      and balance >= ${amount}
+    returning balance
+  `;
+
+  if (!rows.length) return { ok: false, balance: await creditBalance(userId) };
+  const balance = Number(rows[0].balance);
+
+  await sql`
+    insert into rmf_credit_ledger (
+      user_id, delta, balance_after, reason, action, external_ref, metadata, created_at
+    ) values (
+      ${userId}, ${-amount}, ${balance}, 'operator_revoke', 'operator_revoke',
+      ${externalRef}, ${sql.json(metadata as any)}, now()
+    )
+  `;
+  return { ok: true, balance };
+}
+
 export async function consumeCredits(
   userId: string,
   amount: number,
