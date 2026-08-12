@@ -66,6 +66,7 @@ type CompareControl = {
   results: MetricValue;
   gate: string;
   future_tables: string[];
+  schema_ready?: boolean;
 };
 
 export function CompareControlSection({ data }: { data: CompareControl }) {
@@ -89,8 +90,14 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
           >
             Status: {data.status}
           </span>
-          <span className="muted">enabled={String(data.enabled)} · future tables: {data.future_tables.join(", ")}</span>
+          <span className="muted">
+            enabled={String(data.enabled)} · schema=
+            {data.schema_ready ? "ready" : "pending"} · tables: {data.future_tables.join(", ")}
+          </span>
         </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Feature remains DISABLED for users. Job counts are live empties (expect 0) or Unavailable — no fake numbers.
+        </p>
         <section style={grid4}>
           <MetricCard label="Jobs queued" metric={data.jobs_queued} />
           <MetricCard label="Jobs running" metric={data.jobs_running} />

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { COMPARE_ME_TO_ME } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
 import {
   stripeCreditsPriceConfigured,
@@ -29,9 +30,11 @@ export async function GET() {
       metered_memory_cost: 1
     },
     compare_me_to_me: {
-      enabled: false,
-      status: "requires_account_learning",
-      note: "Scaffold only. Ship after consented Personal Network read/write is verified in production."
+      // FEATURE REMAINS DISABLED — schema may exist; do not flip LIVE.
+      enabled: COMPARE_ME_TO_ME.enabled,
+      status: COMPARE_ME_TO_ME.status,
+      note: COMPARE_ME_TO_ME.note,
+      tables: [...COMPARE_ME_TO_ME.tables]
     },
     account_learning: {
       openapi_version: "2.5.3",

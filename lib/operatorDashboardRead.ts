@@ -1,3 +1,4 @@
+import { COMPARE_ME_TO_ME } from "./compareFeature";
 import { databaseConfigured, db } from "./db";
 import { metric, unavailable, type MetricValue } from "./metricValue";
 import {
@@ -145,7 +146,9 @@ export type DashboardV2 = {
     jobs_completed: MetricValue;
     results: MetricValue;
     gate: string;
+    /** Schema table names (may exist while feature stays DISABLED). */
     future_tables: string[];
+    schema_ready: boolean;
   };
   revenue_dashboard: {
     amazon_tag: string;
@@ -209,7 +212,7 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       learning: {
         profiles_created: unavailable("Database not configured"),
         interactions_stored: unavailable("Database not configured"),
-        compare_jobs: metric(0, "Compare Me To Me disabled — no jobs table in production"),
+        compare_jobs: metric(0, "Compare Me To Me DISABLED — no live jobs"),
         social_connections: unavailable("Database not configured")
       }
     },
@@ -258,14 +261,15 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
         "Admin drill-down (user → preferences, goals, history, feedback, recommendations) expands in PR #21 Learning Console."
     },
     compare_me_to_me: {
-      status: "DISABLED",
-      enabled: false,
-      jobs_queued: metric(0, "Feature disabled"),
-      jobs_running: metric(0, "Feature disabled"),
-      jobs_completed: metric(0, "Feature disabled"),
-      results: unavailable("No compare results until image storage + consent + history exist"),
-      gate: "Do NOT enable production until image storage + consent + history exist.",
-      future_tables: ["rmf_compare_jobs", "rmf_compare_results"]
+      status: COMPARE_ME_TO_ME.dashboard_status,
+      enabled: COMPARE_ME_TO_ME.enabled,
+      jobs_queued: metric(0, "Feature DISABLED"),
+      jobs_running: metric(0, "Feature DISABLED"),
+      jobs_completed: metric(0, "Feature DISABLED"),
+      results: unavailable("Feature DISABLED — no results until image storage + consent + history exist"),
+      gate: COMPARE_ME_TO_ME.gate,
+      future_tables: [...COMPARE_ME_TO_ME.tables],
+      schema_ready: false
     },
     revenue_dashboard: {
       amazon_tag: "ratemyfacegpt-20",
@@ -475,11 +479,13 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         })()
       : unavailable("learning_events table not shipped yet");
 
-    let compareQueued: MetricValue = metric(0, "Compare disabled");
-    let compareRunning: MetricValue = metric(0, "Compare disabled");
-    let compareCompleted: MetricValue = metric(0, "Compare disabled");
+    // Feature stays DISABLED. When tables exist, report live empty counts (0),
+    // never invent nonzero activity. When missing, keep 0 / Unavailable.
+    let compareQueued: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
+    let compareRunning: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
+    let compareCompleted: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
     let compareResults: MetricValue = unavailable(
-      "No compare results until image storage + consent + history exist"
+      "Feature DISABLED — results unavailable until schema + consent path ship"
     );
     if (hasCompareJobs) {
       const rows = await tx`
@@ -489,13 +495,19 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           count(*) filter (where status = 'completed')::int as completed
         from rmf_compare_jobs
       `;
-      compareQueued = metric(asNumber(rows[0]?.queued));
-      compareRunning = metric(asNumber(rows[0]?.running));
-      compareCompleted = metric(asNumber(rows[0]?.completed));
+      compareQueued = metric(asNumber(rows[0]?.queued), "Feature DISABLED — live queued count");
+      compareRunning = metric(asNumber(rows[0]?.running), "Feature DISABLED — live running count");
+      compareCompleted = metric(
+        asNumber(rows[0]?.completed),
+        "Feature DISABLED — live completed count"
+      );
     }
     if (hasCompareResults) {
       const rows = await tx`select count(*)::int as total from rmf_compare_results`;
-      compareResults = metric(asNumber(rows[0]?.total));
+      compareResults = metric(
+        asNumber(rows[0]?.total),
+        "Feature DISABLED — live results count (expect 0)"
+      );
     }
 
     // Action calls proxy: credit usage events + agent receipts (not ChatGPT chat count)
@@ -578,7 +590,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           interactions_stored: interactionsStored,
           compare_jobs: hasCompareJobs
             ? compareCompleted
-            : metric(0, "Compare Me To Me disabled — jobs table not in production"),
+            : metric(0, "Compare Me To Me DISABLED — jobs table not applied"),
           social_connections: socialConnections
         }
       },
@@ -638,14 +650,15 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           "."
       },
       compare_me_to_me: {
-        status: "DISABLED" as const,
-        enabled: false as const,
+        status: COMPARE_ME_TO_ME.dashboard_status,
+        enabled: COMPARE_ME_TO_ME.enabled,
         jobs_queued: compareQueued,
         jobs_running: compareRunning,
         jobs_completed: compareCompleted,
         results: compareResults,
-        gate: "Do NOT enable production until image storage + consent + history exist.",
-        future_tables: ["rmf_compare_jobs", "rmf_compare_results"]
+        gate: COMPARE_ME_TO_ME.gate,
+        future_tables: [...COMPARE_ME_TO_ME.tables],
+        schema_ready: hasCompareJobs && hasCompareResults
       },
       revenue_dashboard: {
         amazon_tag: "ratemyfacegpt-20",
