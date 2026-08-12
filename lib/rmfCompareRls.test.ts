@@ -57,7 +57,10 @@ describe("rmf compare RLS migration (policy matrix)", () => {
   });
 
   it("does not FORCE row level security", () => {
-    assert.equal(/\bforce\s+row\s+level\s+security\b/i.test(sqlText), false);
+    assert.equal(
+      /\balter\s+table\b[\s\S]*?\bforce\s+row\s+level\s+security\b/i.test(sqlText),
+      false
+    );
     assert.match(sqlText, /Do NOT enable FORCE/i);
   });
 
@@ -103,11 +106,13 @@ describe("compare feature gate stays off", () => {
     assert.equal(COMPARE_ME_TO_ME.dashboard_status, "DISABLED");
   });
 
-  it("health route still reports compare disabled", () => {
+  it("health route still reports compare disabled via gate constant", () => {
     const health = readFileSync(HEALTH, "utf8");
     assert.match(health, /compare_me_to_me/);
-    assert.match(health, /enabled:\s*false/);
-    assert.match(health, /requires_account_learning/);
+    assert.match(health, /FEATURE REMAINS DISABLED/);
+    assert.match(health, /enabled:\s*COMPARE_ME_TO_ME\.enabled/);
+    assert.match(health, /status:\s*COMPARE_ME_TO_ME\.status/);
+    assert.match(health, /from ["'].*compareFeature["']/);
   });
 });
 
