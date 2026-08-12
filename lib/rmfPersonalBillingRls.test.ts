@@ -127,6 +127,13 @@ describe("rmf personal/billing RLS migration (policy matrix)", () => {
     assert.match(sqlText, /Do NOT enable FORCE/i);
     assert.match(sqlText, /grantCredits|consumeCredits|Account Learning/i);
   });
+
+  it("locks future compare/learning tables only if they already exist (does not create them)", () => {
+    assert.match(sqlText, /rmf_learning_events/);
+    assert.match(sqlText, /rmf_compare_jobs/);
+    assert.match(sqlText, /Do NOT create Compare Me To Me/i);
+    assert.equal(/create table if not exists public\.rmf_compare_/i.test(sqlText), false);
+  });
 });
 
 describe("rmf personal/billing RLS live isolation", { skip: !testDatabaseUrl() }, () => {

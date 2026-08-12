@@ -297,3 +297,25 @@ grant select on table public.rmf_interactions to authenticated;
 grant select on table public.rmf_personal_recommendations to authenticated;
 grant select on table public.rmf_provider_connections to authenticated;
 -- rmf_stripe_events: intentionally no grant to anon/authenticated (service-role-only)
+
+-- ---------------------------------------------------------------------------
+-- Optional / future tables: lock down IF they already exist.
+-- Do NOT create Compare Me To Me tables (feature stays disabled).
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'rmf_learning_events',
+    'rmf_compare_jobs',
+    'rmf_compare_results'
+  ]
+  loop
+    if to_regclass('public.' || t) is not null then
+      execute format('alter table public.%I enable row level security', t);
+      execute format('revoke all on table public.%I from anon, authenticated', t);
+    end if;
+  end loop;
+end $$;
