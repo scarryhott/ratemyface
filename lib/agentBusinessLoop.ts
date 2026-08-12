@@ -18,6 +18,8 @@ export type BusinessMetricsSnapshot = {
   agent_signals_queued: number | null;
   pending_approvals: number | null;
   compare_enabled: false;
+  /** Appearance Agent product path — always false until learning + compare gates met. */
+  appearance_agent_enabled: false;
   credits_per_pack: number;
   signup_credits: number;
   amazon_tag: string;
@@ -78,6 +80,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     agent_signals_queued: null,
     pending_approvals: null,
     compare_enabled: false,
+    appearance_agent_enabled: false,
     credits_per_pack: creditsPerPack(),
     signup_credits: signupCredits(),
     amazon_tag: "ratemyfacegpt-20",
@@ -271,7 +274,8 @@ export function businessImproveGoal(): string {
     "Propose one reversible next step at minimum authority.",
     "Return JSON including business_impact:{bottleneck,hypothesis,recommended_next_step,expected_metric_effect,funnel_stage,confidence}.",
     "Do not invent ChatGPT chat counts, Amazon revenue, or Stripe USD. Label missing sources Unavailable.",
-    "Compare Me To Me stays DISABLED. Prefer Account Learning + credit economy closure over new features.",
+    "Compare Me To Me stays DISABLED. Appearance Agent stays DISABLED (not LIVE paid coaching; requires Account Learning + Compare).",
+    "Prefer Account Learning + credit economy closure over new features.",
     "Report clearly how the recommended strategy helps the business."
   ].join(" ");
 }

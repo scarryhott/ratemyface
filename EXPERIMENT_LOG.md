@@ -77,3 +77,15 @@ Append one concise entry per material experiment.
 - **Change made:** token_ref/connected_at/revoked_at columns + RLS re-assert; connect/disconnect stubs; dashboard Social section; Compare Me To Me remains DISABLED; Amazon untouched.
 - **Rollback:** revert social-provider OAuth skeleton commits; leave prior `rmf_provider_connections` base table from personal/billing RLS migration.
 - **Next / monitor:** do not enable live social OAuth until Instagram/LinkedIn/TikTok credentials exist in Vercel; never log raw tokens — store encrypted `token_ref` only.
+
+### 2026-08-12 — Autonomous Appearance Agent (scaffold, not LIVE)
+- **Surface:** Vercel API + Supabase schema + operator dashboard + Agent Console business loop notes
+- **Hypothesis:** A 90-day appearance plan/check-in schema can sit behind `appearance_agent.enabled=false` / `requires_compare_and_learning` without falsely claiming LIVE paid coaching.
+- **Variant A:** n/a (infra scaffold only)
+- **Variant B:** n/a
+- **Metric:** stubs return `503 appearance_agent_disabled`; health `appearance_agent.enabled=false`; dashboard plans/check-ins are live `0` or Unavailable — no fake metrics; GPT instructions say not live.
+- **Evidence/source:** migration `20260812200000_create_rmf_appearance_agent_tables.sql`, `/api/appearance*`, `APPEARANCE_AGENT.md`, operator section 5c, `agentBusinessLoop` gate note.
+- **Result:** pending ops apply of migration; feature stays DISABLED until Account Learning history + Compare Me To Me ready.
+- **Change made:** plans/checkins tables + RLS; gate module; 503 stubs; health + dashboard Appearance Agent section with not-LIVE callout; credits metering noted for future paid ops. Amazon untouched; social stays `not_configured`; Compare stays DISABLED.
+- **Rollback:** revert appearance-agent scaffold commits; drop `rmf_appearance_*` tables if applied.
+- **Next / monitor:** do not add OpenAPI Action or flip LIVE until learning + compare gates met; meter future paid ops via Stripe RMF credits.

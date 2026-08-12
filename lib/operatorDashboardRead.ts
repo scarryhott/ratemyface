@@ -1,3 +1,4 @@
+import { APPEARANCE_AGENT } from "./appearanceAgent";
 import { COMPARE_ME_TO_ME } from "./compareFeature";
 import { databaseConfigured, db } from "./db";
 import { metric, unavailable, type MetricValue } from "./metricValue";
@@ -151,6 +152,20 @@ export type DashboardV2 = {
     future_tables: string[];
     schema_ready: boolean;
   };
+  appearance_agent: {
+    status: "DISABLED" | "TESTING" | "LIVE";
+    enabled: false;
+    plans_total: MetricValue;
+    plans_draft: MetricValue;
+    plans_active: MetricValue;
+    checkins: MetricValue;
+    gate: string;
+    future_tables: string[];
+    schema_ready: boolean;
+    note: string;
+    target_days: number;
+    depends_on: string[];
+  };
   social_providers: {
     status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
     enabled: false;
@@ -287,6 +302,20 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       future_tables: [...COMPARE_ME_TO_ME.tables],
       schema_ready: false
     },
+    appearance_agent: {
+      status: APPEARANCE_AGENT.dashboard_status,
+      enabled: APPEARANCE_AGENT.enabled,
+      plans_total: metric(0, "Feature DISABLED — not LIVE paid coaching"),
+      plans_draft: metric(0, "Feature DISABLED"),
+      plans_active: unavailable("Feature DISABLED — active plans unavailable"),
+      checkins: unavailable("Feature DISABLED — check-ins unavailable until schema + gates ship"),
+      gate: APPEARANCE_AGENT.gate,
+      future_tables: [...APPEARANCE_AGENT.tables],
+      schema_ready: false,
+      note: APPEARANCE_AGENT.note,
+      target_days: APPEARANCE_AGENT.target_days,
+      depends_on: [...APPEARANCE_AGENT.depends_on]
+    },
     social_providers: {
       status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
       enabled: SOCIAL_PROVIDER_OAUTH.enabled,
@@ -380,6 +409,8 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
     const hasUsers = await tableExists(tx, "rmf_users");
     const hasCompareJobs = await tableExists(tx, "rmf_compare_jobs");
     const hasCompareResults = await tableExists(tx, "rmf_compare_results");
+    const hasAppearancePlans = await tableExists(tx, "rmf_appearance_plans");
+    const hasAppearanceCheckins = await tableExists(tx, "rmf_appearance_checkins");
     const hasLearningEvents = await tableExists(tx, "rmf_learning_events");
 
     // Users / activity from auth + oauth
@@ -557,6 +588,48 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       );
     }
 
+    // Appearance Agent stays DISABLED (not LIVE paid coaching). When tables exist,
+    // report live empty counts (0); never invent nonzero activity.
+    let appearancePlansTotal: MetricValue = metric(
+      0,
+      "Feature DISABLED — plans table not applied · not LIVE paid coaching"
+    );
+    let appearancePlansDraft: MetricValue = metric(0, "Feature DISABLED — plans table not applied");
+    let appearancePlansActive: MetricValue = unavailable(
+      "Feature DISABLED — active plans unavailable until gates ship"
+    );
+    let appearanceCheckins: MetricValue = unavailable(
+      "Feature DISABLED — check-ins unavailable until schema + learning/compare gates ship"
+    );
+    if (hasAppearancePlans) {
+      const rows = await tx`
+        select
+          count(*)::int as total,
+          count(*) filter (where status = 'draft')::int as draft,
+          count(*) filter (where status = 'active')::int as active
+        from rmf_appearance_plans
+      `;
+      appearancePlansTotal = metric(
+        asNumber(rows[0]?.total),
+        "Feature DISABLED — live plan count (expect 0) · not LIVE paid coaching"
+      );
+      appearancePlansDraft = metric(
+        asNumber(rows[0]?.draft),
+        "Feature DISABLED — live draft count"
+      );
+      appearancePlansActive = metric(
+        asNumber(rows[0]?.active),
+        "Feature DISABLED — live active count (expect 0)"
+      );
+    }
+    if (hasAppearanceCheckins) {
+      const rows = await tx`select count(*)::int as total from rmf_appearance_checkins`;
+      appearanceCheckins = metric(
+        asNumber(rows[0]?.total),
+        "Feature DISABLED — live check-in count (expect 0)"
+      );
+    }
+
     // Action calls proxy: credit usage events + agent receipts (not ChatGPT chat count)
     const actionCalls = hasLedger
       ? metric(
@@ -706,6 +779,20 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         gate: COMPARE_ME_TO_ME.gate,
         future_tables: [...COMPARE_ME_TO_ME.tables],
         schema_ready: hasCompareJobs && hasCompareResults
+      },
+      appearance_agent: {
+        status: APPEARANCE_AGENT.dashboard_status,
+        enabled: APPEARANCE_AGENT.enabled,
+        plans_total: appearancePlansTotal,
+        plans_draft: appearancePlansDraft,
+        plans_active: appearancePlansActive,
+        checkins: appearanceCheckins,
+        gate: APPEARANCE_AGENT.gate,
+        future_tables: [...APPEARANCE_AGENT.tables],
+        schema_ready: hasAppearancePlans && hasAppearanceCheckins,
+        note: APPEARANCE_AGENT.note,
+        target_days: APPEARANCE_AGENT.target_days,
+        depends_on: [...APPEARANCE_AGENT.depends_on]
       },
       social_providers: {
         status: SOCIAL_PROVIDER_OAUTH.dashboard_status,

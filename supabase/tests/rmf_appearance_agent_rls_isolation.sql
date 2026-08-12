@@ -1,0 +1,32 @@
+-- Manual verification for Appearance Agent RLS isolation.
+-- Apply after 20260812200000_create_rmf_appearance_agent_tables.sql.
+--
+-- Expected:
+--   authenticated + sub=UserA → own rows only
+--   authenticated + sub=UserA → UserB rows empty
+--   anon → permission denied
+--   postgres/table owner → full read/write
+--   Feature remains DISABLED in app (/api/health.appearance_agent.enabled=false)
+--   Not LIVE paid coaching — scaffold only
+
+-- Example seed (server role):
+-- insert into rmf_appearance_plans (user_id, goal, status, day_index) values
+--   ('11111111-1111-4111-8111-111111111111', 'professional polish', 'draft', 0),
+--   ('22222222-2222-4222-8222-222222222222', 'grooming routine', 'draft', 0);
+
+-- As authenticated User A:
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+--   select user_id, status from rmf_appearance_plans;    -- expect only User A
+--   select user_id from rmf_appearance_checkins;         -- expect only User A (or empty)
+--   insert into rmf_appearance_plans (user_id, goal)     -- expect permission denied
+--     values ('11111111-1111-4111-8111-111111111111', 'x');
+-- rollback;
+
+-- As anon:
+-- begin;
+--   set local role anon;
+--   select * from rmf_appearance_plans;                  -- expect permission denied
+--   select * from rmf_appearance_checkins;               -- expect permission denied
+-- rollback;

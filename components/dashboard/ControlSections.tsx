@@ -109,6 +109,64 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
   );
 }
 
+type AppearanceAgentControl = {
+  status: "DISABLED" | "TESTING" | "LIVE";
+  enabled: false;
+  plans_total: MetricValue;
+  plans_draft: MetricValue;
+  plans_active: MetricValue;
+  checkins: MetricValue;
+  gate: string;
+  future_tables: string[];
+  schema_ready?: boolean;
+  note: string;
+  target_days: number;
+  depends_on: string[];
+};
+
+export function AppearanceAgentSection({ data }: { data: AppearanceAgentControl }) {
+  return (
+    <>
+      <SectionHeading
+        id="appearance-agent"
+        title="5c. Appearance Agent"
+        subtitle={data.gate}
+      />
+      <section className="card">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <span
+            style={{
+              borderRadius: 999,
+              padding: "6px 12px",
+              fontWeight: 700,
+              background: "#f2f4f7",
+              color: "#344054"
+            }}
+          >
+            Status: {data.status}
+          </span>
+          <span className="muted">
+            enabled={String(data.enabled)} · schema=
+            {data.schema_ready ? "ready" : "pending"} · {data.target_days}-day loop · tables:{" "}
+            {data.future_tables.join(", ")}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          <strong>Not LIVE paid coaching.</strong> {data.note} Depends on:{" "}
+          {data.depends_on.join(", ")}. Plan/check-in counts are live empties (expect 0) or
+          Unavailable — no fake numbers. Credits will meter future paid ops.
+        </p>
+        <section style={grid4}>
+          <MetricCard label="Plans (total)" metric={data.plans_total} />
+          <MetricCard label="Plans draft" metric={data.plans_draft} />
+          <MetricCard label="Plans active" metric={data.plans_active} />
+          <MetricCard label="Check-ins" metric={data.checkins} />
+        </section>
+      </section>
+    </>
+  );
+}
+
 type SocialProvidersControl = {
   status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
   enabled: false;
