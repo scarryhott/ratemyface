@@ -213,8 +213,8 @@ export function AgentConsoleSection({
     <>
       <SectionHeading
         id="agents"
-        title="8. Agent Console — chat, manage, autonomous improve"
-        subtitle="Talk to the operator agent, queue/run signals, approve work, and review strategy impact reports. Cron + owner-triggered business_improve cycles write reports here so you can see how the commercial strategy helps the business."
+        title="Chat & manage agents"
+        subtitle="Send messages, run improve cycles, approve work, and read how strategy helps the business. Your Grok bot can keep doing hourly ChatGPT checks — this console is the operator control surface."
       />
 
       <section style={grid2}>
