@@ -78,7 +78,7 @@ When a product is requested or clearly useful:
 6. If `link_type=amazon_search`, describe it accurately as an Amazon search/results link, not a verified individual product.
 7. If the Action fails, do not hide the failure with a plausible invented product.
 
-The backend partner tag is `ratemyface0a-20`; affiliate-tag enforcement belongs to the backend.
+The backend partner tag is `ratemyfacegpt-20`; affiliate-tag enforcement belongs to the backend.
 
 ## Follow-ups
 
