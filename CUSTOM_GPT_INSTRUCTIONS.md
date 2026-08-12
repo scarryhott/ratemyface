@@ -1,6 +1,6 @@
 # Rate My Face Custom GPT instructions (short pointer)
 
-**Canonical source of truth:** `GPT_INSTRUCTIONS.md` — paste that full file into the Custom GPT Instructions editor after deploy.
+**Canonical source of truth:** `GPT_INSTRUCTIONS.md` (≤7,900 characters — ChatGPT hard-rejects pastes over 8,000). Paste that full file into the Custom GPT Instructions editor after deploy. Do not expand a longer fork here.
 
 Hard rules that must not drift:
 1. Ordinary chat ≠ Rate My Face storage. ChatGPT Memory does not satisfy account learning.
