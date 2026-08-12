@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { db } from "./db";
 import {
+  recordStrategyFromRun,
+  type BusinessMetricsSnapshot
+} from "./agentBusinessLoop";
+import {
   normalizeModelPlan,
   resolveClosure,
   type OperatorModelPlan
@@ -287,7 +291,15 @@ function fallbackAnalysisPlan(reason: string): OperatorModelPlan {
     candidates: [],
     required_authority: 1,
     requires_human_approval: false,
-    verification: ["Confirm that no mutating tool was selected or executed."]
+    verification: ["Confirm that no mutating tool was selected or executed."],
+    business_impact: {
+      bottleneck: "operator_planner_unavailable",
+      hypothesis: "Restoring AI Gateway planning unblocks autonomous improve cycles.",
+      recommended_next_step: "Verify AI_GATEWAY_API_KEY / model config, then re-run business_improve from the dashboard Agent Console.",
+      expected_metric_effect: "No business metric change until planner recovers — report only.",
+      funnel_stage: "ops",
+      confidence: "high"
+    }
   });
 }
 
@@ -316,7 +328,7 @@ export async function gatewayPlan(input: unknown) {
           {
             role: "system",
             content:
-              "You are the planning component inside the Rate My Face closure-native builder harness. You do not directly execute tools. Return JSON only with keys summary, observations, candidates, required_authority, requires_human_approval, verification. candidates must be an array of objects with id, tool, authority, intent, reason, expected_return, reversible, invariants, args. Use only tools present in the supplied registry. Prefer the lowest authority and reversible actions. Never request, reveal, place in a prompt, or write credentials. L0=observe, L1=analyze, L2=isolated branch/sandbox, L3=preview, L4=bounded production, L5=economic spend, L6=strategic/permission expansion. Never claim an action executed; execution and verification are performed by the harness after your plan."
+              "You are the planning component inside the Rate My Face closure-native builder harness. You do not directly execute tools. Return JSON only with keys summary, observations, candidates, required_authority, requires_human_approval, verification, business_impact. business_impact must be an object with bottleneck, hypothesis, recommended_next_step, expected_metric_effect, funnel_stage, confidence. candidates must be an array of objects with id, tool, authority, intent, reason, expected_return, reversible, invariants, args. Use only tools present in the supplied registry. Prefer the lowest authority and reversible actions. Never request, reveal, place in a prompt, or write credentials. L0=observe, L1=analyze, L2=isolated branch/sandbox, L3=preview, L4=bounded production, L5=economic spend, L6=strategic/permission expansion. Never claim an action executed; execution and verification are performed by the harness after your plan. For owner_chat, heartbeat, and business_improve signals, prioritize the commercial loop (free GPT → Action → account → persistence → credits → retention → experiment → profit) and explain how the recommended strategy helps the business. Never invent ChatGPT chat counts, Amazon revenue, or Stripe USD — mark missing sources Unavailable. Compare Me To Me stays DISABLED."
           },
           {
             role: "user",
@@ -360,6 +372,33 @@ export async function runOneSignal() {
     returning id
   `;
   const runId = Number(runs[0].id);
+  const payload =
+    signal.payload && typeof signal.payload === "object"
+      ? (signal.payload as Record<string, unknown>)
+      : {};
+  const metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
+
+  async function persistStrategy(
+    status: string,
+    plan: OperatorModelPlan | null,
+    closureState?: string | null
+  ) {
+    try {
+      return await recordStrategyFromRun({
+        source: String(signal.source),
+        kind: String(signal.kind),
+        runId,
+        signalId: Number(signal.id),
+        status,
+        closureState: closureState || null,
+        plan,
+        payload,
+        metricsBefore
+      });
+    } catch {
+      return null;
+    }
+  }
 
   try {
     await ledger(runId, "signal_admitted", admittedAuthority, {
@@ -432,13 +471,15 @@ export async function runOneSignal() {
         where id=${runId}
       `;
       await sql`update rmf_agent_signals set status='awaiting_approval',completed_at=now() where id=${signal.id}`;
+      const strategy_report = await persistStrategy("awaiting_approval", ai.plan, closure.state);
       return {
         ok: true,
         run_id: runId,
         status: "awaiting_approval",
         harness: "closure-native-v1",
         plan: ai.plan,
-        closure
+        closure,
+        strategy_report
       };
     }
 
@@ -453,13 +494,15 @@ export async function runOneSignal() {
         reason: closure.reason,
         self_limit: closure.self_limit
       }, undefined, false);
+      const strategy_report = await persistStrategy("halted", ai.plan, closure.state);
       return {
         ok: true,
         run_id: runId,
         status: "halted",
         harness: "closure-native-v1",
         plan: ai.plan,
-        closure
+        closure,
+        strategy_report
       };
     }
 
@@ -508,6 +551,7 @@ export async function runOneSignal() {
       self_limit: "halt_after_one_tool_return"
     }, receipt.tool, receipt.verified);
 
+    const strategy_report = await persistStrategy(finalStatus, ai.plan, receipt.verified ? "closed" : "verification_failed");
     return {
       ok: receipt.verified,
       run_id: runId,
@@ -515,7 +559,8 @@ export async function runOneSignal() {
       harness: "closure-native-v1",
       plan: ai.plan,
       closure,
-      receipt
+      receipt,
+      strategy_report
     };
   } catch (error) {
     const message = errorMessage(error);

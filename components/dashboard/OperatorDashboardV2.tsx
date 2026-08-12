@@ -13,6 +13,7 @@ import {
   OpsHealthSection
 } from "./ControlSections";
 import { FounderCreditPanel } from "./FounderCreditPanel";
+import { AgentConsoleSection } from "./AgentConsole";
 import {
   pill,
   button,
@@ -53,7 +54,8 @@ const SECTIONS = [
   { id: "learning", label: "Learning" },
   { id: "compare", label: "Compare" },
   { id: "revenue", label: "Revenue" },
-  { id: "ops-health", label: "Ops health" }
+  { id: "ops-health", label: "Ops health" },
+  { id: "agents", label: "Agents" }
 ];
 
 export default function OperatorDashboardV2() {
@@ -159,8 +161,8 @@ export default function OperatorDashboardV2() {
           <h1 style={{ margin: 0, fontSize: 36 }}>Rate My Face Business · Dashboard v2</h1>
           <p className="muted" style={{ maxWidth: 780 }}>
             Owner-only business controller: overview, credit economy, GPT portfolio, Account Learning, Compare Me To Me
-            (disabled), revenue, and ops health. {productCreditLabel}. Vercel Hobby / AI Gateway are infrastructure — not
-            product credits.
+            (disabled), revenue, ops health, and Agent Console (chat / manage / autonomous improve). {productCreditLabel}.
+            Vercel Hobby / AI Gateway are infrastructure — not product credits.
           </p>
         </div>
         <div
@@ -318,6 +320,12 @@ export default function OperatorDashboardV2() {
               databaseConfigured={Boolean(data.database_configured)}
             />
           )}
+
+          <AgentConsoleSection
+            canOperate={Boolean(owner || secret)}
+            authHeaders={authHeaders}
+            onBusinessRefresh={() => loadDashboard()}
+          />
 
           {!!ops?.recent_runs?.length && (
             <section className="card" style={{ marginTop: 16 }}>
