@@ -5,6 +5,7 @@ import {
   getOperatorOpsRead,
   infrastructureCreditBoundary
 } from "./operatorOpsRead";
+import { SOCIAL_PROVIDER_OAUTH } from "./providerConnections";
 import {
   creditsPerPack,
   signupCredits
@@ -150,6 +151,21 @@ export type DashboardV2 = {
     future_tables: string[];
     schema_ready: boolean;
   };
+  social_providers: {
+    status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
+    enabled: false;
+    oauth_ready: false;
+    scraping: false;
+    auth_mode: string;
+    planned: string[];
+    connection_rows: MetricValue;
+    connected: MetricValue;
+    revoked: MetricValue;
+    gate: string;
+    table: string;
+    schema_ready: boolean;
+    note: string;
+  };
   revenue_dashboard: {
     amazon_tag: string;
     amazon_attribution: string;
@@ -270,6 +286,21 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       gate: COMPARE_ME_TO_ME.gate,
       future_tables: [...COMPARE_ME_TO_ME.tables],
       schema_ready: false
+    },
+    social_providers: {
+      status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
+      enabled: SOCIAL_PROVIDER_OAUTH.enabled,
+      oauth_ready: false,
+      scraping: SOCIAL_PROVIDER_OAUTH.scraping,
+      auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
+      planned: [...SOCIAL_PROVIDER_OAUTH.providers],
+      connection_rows: unavailable("Database not configured"),
+      connected: unavailable("Database not configured"),
+      revoked: unavailable("Database not configured"),
+      gate: SOCIAL_PROVIDER_OAUTH.gate,
+      table: SOCIAL_PROVIDER_OAUTH.table,
+      schema_ready: false,
+      note: SOCIAL_PROVIDER_OAUTH.note
     },
     revenue_dashboard: {
       amazon_tag: "ratemyfacegpt-20",
@@ -461,9 +492,25 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
     }
 
     let socialConnections: MetricValue = unavailable("rmf_provider_connections missing");
+    let socialConnected: MetricValue = unavailable("rmf_provider_connections missing");
+    let socialRevoked: MetricValue = unavailable("rmf_provider_connections missing");
     if (hasProviders) {
-      const rows = await tx`select count(*)::int as total from rmf_provider_connections`;
-      socialConnections = metric(asNumber(rows[0]?.total), "provider connection rows");
+      const rows = await tx`
+        select
+          count(*)::int as total,
+          count(*) filter (where status = 'connected')::int as connected,
+          count(*) filter (where status = 'revoked')::int as revoked
+        from rmf_provider_connections
+      `;
+      socialConnections = metric(
+        asNumber(rows[0]?.total),
+        "provider connection rows (expect 0 — OAuth not configured)"
+      );
+      socialConnected = metric(
+        asNumber(rows[0]?.connected),
+        "status=connected (expect 0 until OAuth secrets exist)"
+      );
+      socialRevoked = metric(asNumber(rows[0]?.revoked), "status=revoked rows");
     }
 
     let usersWithProfiles: MetricValue = profilesCreated;
@@ -659,6 +706,25 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         gate: COMPARE_ME_TO_ME.gate,
         future_tables: [...COMPARE_ME_TO_ME.tables],
         schema_ready: hasCompareJobs && hasCompareResults
+      },
+      social_providers: {
+        status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
+        enabled: SOCIAL_PROVIDER_OAUTH.enabled,
+        oauth_ready: false,
+        scraping: SOCIAL_PROVIDER_OAUTH.scraping,
+        auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
+        planned: [...SOCIAL_PROVIDER_OAUTH.providers],
+        connection_rows: socialConnections,
+        connected: hasProviders
+          ? socialConnected
+          : unavailable("rmf_provider_connections missing"),
+        revoked: hasProviders
+          ? socialRevoked
+          : unavailable("rmf_provider_connections missing"),
+        gate: SOCIAL_PROVIDER_OAUTH.gate,
+        table: SOCIAL_PROVIDER_OAUTH.table,
+        schema_ready: hasProviders,
+        note: SOCIAL_PROVIDER_OAUTH.note
       },
       revenue_dashboard: {
         amazon_tag: "ratemyfacegpt-20",

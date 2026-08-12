@@ -31,7 +31,7 @@
     "premium_subscription": "not configured; STRIPE_PRICE_ID_PREMIUM is absent in current credit model and premium subscription must not be advertised",
     "security": "critical: RLS is disabled on rmf_users, rmf_user_context, rmf_conversation_summaries, rmf_recommendations, rmf_billing_accounts, rmf_entitlements, rmf_stripe_events, rmf_credit_accounts and rmf_credit_ledger; remediation requires explicit policy design before enabling RLS",
     "pending_pr_16": "open, not merged: proposes signup/founder bootstrap credits and operator grants. Latest branch revision defaults signup grant to 100 credits unless RMF_SIGNUP_CREDITS=0. This materially changes activation/monetization behavior and requires explicit product approval before merge.",
-    "social_provider_connections": "schema path exists but no provider OAuth connection is evidenced"
+    "social_provider_connections": "OAuth skeleton shipped: rmf_provider_connections + /api/providers stubs return not_configured; Instagram/LinkedIn/TikTok planned OAuth-only; no live connect until secrets configured; never scrape"
   },
   "action_classification": {
     "searchProduct": "FREE",
