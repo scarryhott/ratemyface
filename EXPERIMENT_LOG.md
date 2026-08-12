@@ -53,3 +53,15 @@ Append one concise entry per material experiment.
 - **Change made:** aligned canonical GPT and Stripe billing documentation to the deployed OpenAPI v2.4.0 credit-metered Action surface; no new Action or endpoint was added.
 - **Rollback:** revert commits `5b5de88962b556719d11ac9f3fe82256589f0244` and `54c562eb1f961de9cf0cdd0fdad434c19a3d49c1`.
 - **Next:** re-import the deployed OpenAPI schema, run one manual authenticated GPT transcript, then instrument Action calls/402s/returning authenticated users before interpreting the A/B test.
+
+### 2026-08-12 — Continuity CTA after free recommendation
+- **Surface:** GPT + Personal Network activation
+- **Hypothesis:** After a successful free product recommendation, a concise optional prompt to save relevant preferences for next time will increase authenticated Personal Network activation without reducing completion of the free recommendation flow.
+- **Variant A:** neutral follow-up with no persistence prompt.
+- **Variant B:** concise opt-in continuity prompt offering account-backed preference saving; paid persistence is attempted only after explicit user intent/consent.
+- **Metric:** `updatePersonalNetwork` attempts/successes per successful `searchProduct`; secondary: credit-checkout starts and 7-day authenticated return rate; guardrail: free recommendation completion does not fall more than 5%.
+- **Evidence/source:** live Rate My Face state shows zero Stripe Checkout Sessions and zero credit-account rows, so activation is the immediate funnel gap; current public adjacent apps emphasize learned taste/profiles, routine/history, and progress over one-shot analysis.
+- **Result:** pending — first-party GPT/Action funnel telemetry is still missing.
+- **Change made:** fixed an internal table-name collision that would have broken paid saved-recommendation writes by separating Personal Network recommendations into `rmf_personal_recommendations` (commit `ba7310254421f38d47924a161740469ca1ebe246`). No Action operation, endpoint, parameter contract, auth requirement, or OpenAPI schema changed.
+- **Rollback:** revert commit `ba7310254421f38d47924a161740469ca1ebe246`.
+- **Next:** verify the fix deploys, run one authenticated `getEntitlements → updatePersonalNetwork → getPersonalNetwork` transcript, then instrument activation events before judging the CTA experiment.
