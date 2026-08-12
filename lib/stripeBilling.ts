@@ -51,10 +51,13 @@ export function creditsPerPack(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
 }
 
-/** One-time non-purchase bootstrap so first remember + preference read can succeed with 0 purchased credits. */
+/** Optional one-time non-purchase OAuth bootstrap (0 disables). Default 100 for Account Learning testing. */
 export function signupCredits(): number {
-  const parsed = Number.parseInt(process.env.RMF_SIGNUP_CREDITS || "25", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
+  const raw = process.env.RMF_SIGNUP_CREDITS;
+  if (raw === undefined || raw.trim() === "") return 100;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return 100;
+  return parsed;
 }
 
 export async function ensureBillingSchema(): Promise<void> {
@@ -281,9 +284,10 @@ export async function grantCredits(
   return balance;
 }
 
-/** Idempotent one-time signup grant for Account Learning bootstrap (not a Stripe purchase). */
+/** Idempotent optional signup grant via the same grantCredits ledger (not a Stripe purchase). Set RMF_SIGNUP_CREDITS=0 to disable. */
 export async function ensureSignupCreditGrant(userId: string): Promise<number> {
   const amount = signupCredits();
+  if (amount <= 0) return creditBalance(userId);
   return grantCredits(
     userId,
     amount,
@@ -293,72 +297,7 @@ export async function ensureSignupCreditGrant(userId: string): Promise<number> {
   );
 }
 
-/**
- * Owner/operator adjust of Stripe-ledger product credits (founder/test grants).
- * Positive delta grants; negative delta claws back without touching lifetime_spent usage totals.
- */
-export async function adjustProductCredits(
-  userId: string,
-  delta: number,
-  externalRef: string,
-  metadata: Record<string, unknown> = {}
-): Promise<{ ok: boolean; balance: number; error?: string }> {
-  if (!Number.isInteger(delta) || delta === 0) {
-    return { ok: false, balance: await creditBalance(userId), error: "invalid_credit_adjust" };
-  }
-  await ensureBillingSchema();
-  const sql = db();
-
-  const existing = await sql`
-    select balance_after
-    from rmf_credit_ledger
-    where external_ref = ${externalRef}
-    limit 1
-  `;
-  if (existing.length) return { ok: true, balance: Number(existing[0].balance_after) };
-
-  if (delta > 0) {
-    const balance = await grantCredits(userId, delta, externalRef, metadata, {
-      reason: "operator_grant",
-      countAsPurchased: false
-    });
-    return { ok: true, balance };
-  }
-
-  const amount = -delta;
-  const rows = await sql`
-    insert into rmf_credit_accounts (user_id, balance, updated_at)
-    values (${userId}, 0, now())
-    on conflict (user_id) do update set updated_at = now()
-    returning balance
-  `;
-  const current = Number(rows[0]?.balance || 0);
-  if (current < amount) {
-    return { ok: false, balance: current, error: "insufficient_balance" };
-  }
-
-  const updated = await sql`
-    update rmf_credit_accounts
-    set balance = balance - ${amount},
-        updated_at = now()
-    where user_id = ${userId}
-      and balance >= ${amount}
-    returning balance
-  `;
-  if (!updated.length) {
-    return { ok: false, balance: await creditBalance(userId), error: "insufficient_balance" };
-  }
-  const balance = Number(updated[0].balance);
-  await sql`
-    insert into rmf_credit_ledger (
-      user_id, delta, balance_after, reason, external_ref, metadata, created_at
-    ) values (
-      ${userId}, ${delta}, ${balance}, 'operator_adjust', ${externalRef}, ${sql.json(metadata as any)}, now()
-    )
-  `;
-  return { ok: true, balance };
-}
-
+/** Read current Stripe-ledger product credit balance + recent rmf_credit_ledger rows for operator UI. */
 export async function creditAccountOverview(userId: string) {
   await ensureBillingSchema();
   const sql = db();

@@ -125,7 +125,7 @@ export default function OperatorBusinessDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [creditUserId, setCreditUserId] = useState("");
-  const [creditDelta, setCreditDelta] = useState("25");
+  const [creditAmount, setCreditAmount] = useState("100");
   const [creditNote, setCreditNote] = useState("");
   const [creditLookup, setCreditLookup] = useState<CreditAccount | null>(null);
   const [creditBusy, setCreditBusy] = useState(false);
@@ -180,23 +180,23 @@ export default function OperatorBusinessDashboard() {
     } finally { setCreditBusy(false); }
   }
 
-  async function adjustCredits() {
+  async function grantCreditsToUser() {
     const userId = creditUserId.trim();
-    const delta = Number.parseInt(creditDelta, 10);
+    const amount = Number.parseInt(creditAmount, 10);
     if (!userId) { setCreditMessage("Enter a user_id (OAuth subject)."); return; }
-    if (!Number.isInteger(delta) || delta === 0) { setCreditMessage("Delta must be a non-zero integer."); return; }
+    if (!Number.isInteger(amount) || amount <= 0) { setCreditMessage("Amount must be a positive integer."); return; }
     setCreditBusy(true); setCreditMessage("");
     try {
       const response = await fetch("/api/operator/credits", {
         method: "POST",
         headers: authHeaders(),
         credentials: "same-origin",
-        body: JSON.stringify({ user_id: userId, delta, note: creditNote.trim() || undefined })
+        body: JSON.stringify({ user_id: userId, amount, note: creditNote.trim() || undefined })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `HTTP_${response.status}`);
       setCreditLookup(body.account as CreditAccount);
-      setCreditMessage(`Adjusted by ${delta}. New balance ${body.account?.balance ?? 0} (Stripe RMF product credits — not Vercel).`);
+      setCreditMessage(`Granted ${amount} via grantCredits. Balance ${body.account?.balance ?? body.balance ?? 0} (Stripe RMF product ledger — not Vercel).`);
       await loadOps();
     } catch (err) {
       setCreditMessage(err instanceof Error ? err.message : String(err));
@@ -272,15 +272,15 @@ export default function OperatorBusinessDashboard() {
         <section style={{ ...grid4 }}>
           <Metric label="Pack size" value={creditModel?.credits_per_pack ?? 100} note="createCreditCheckoutSession" />
           <Metric label="Metered Action cost" value={creditModel?.metered_personal_cost ?? 1} note={`memory ${creditModel?.metered_memory_cost ?? 1} · report ${creditModel?.report_cost ?? 5}`} />
-          <Metric label="Signup bootstrap grant" value={creditModel?.signup_credits ?? 25} note="One-time non-purchase grant (Stripe ledger)" />
+          <Metric label="Optional signup grant" value={creditModel?.signup_credits ?? 100} note={(creditModel?.signup_credits ?? 100) > 0 ? "RMF_SIGNUP_CREDITS → grantCredits once" : "Disabled (RMF_SIGNUP_CREDITS=0)"} />
           <Metric label="Stored profiles" value={billing?.personal_profiles} note={`${num(billing?.memory_contexts)} legacy memory contexts`} />
         </section>
 
         <section className="card" style={{ marginTop: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Grant / adjust product credits (Stripe ledger)</h2>
+          <h2 style={{ marginTop: 0 }}>Founder grant — product credits (Stripe ledger)</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Founder/test grants for Rate My Face product credits only — not Vercel Hobby quotas and not Vercel AI Gateway USD.
-            Signup bootstrap already grants {creditModel?.signup_credits ?? 25} once per user (`signup_grant`); use this for extra founder/test top-ups.
+            Preferred test path: look up an OAuth <code>user_id</code>, then grant into the same <code>grantCredits</code> / <code>rmf_credit_ledger</code> used by checkout webhooks and Action metering.
+            Not Vercel Hobby / AI Gateway. Optional first-OAuth signup grant is {creditModel?.signup_credits ?? 100} when enabled (<code>RMF_SIGNUP_CREDITS</code>; set <code>0</code> to disable).
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             <input
@@ -291,9 +291,9 @@ export default function OperatorBusinessDashboard() {
             />
             <input
               style={{ ...input, minWidth: 120, flex: "0 0 120px" }}
-              placeholder="Delta (+/-)"
-              value={creditDelta}
-              onChange={(e) => setCreditDelta(e.target.value)}
+              placeholder="Amount"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
             />
             <input
               style={input}
@@ -306,8 +306,8 @@ export default function OperatorBusinessDashboard() {
             <button style={secondaryButton} disabled={creditBusy || (!owner && !secret)} onClick={() => void lookupCredits()}>
               {creditBusy ? "Working…" : "Show balance"}
             </button>
-            <button style={button} disabled={creditBusy || (!owner && !secret)} onClick={() => void adjustCredits()}>
-              Apply delta
+            <button style={button} disabled={creditBusy || (!owner && !secret)} onClick={() => void grantCreditsToUser()}>
+              Grant credits
             </button>
           </div>
           {creditMessage && <p style={{ marginBottom: 0, marginTop: 12 }}>{creditMessage}</p>}

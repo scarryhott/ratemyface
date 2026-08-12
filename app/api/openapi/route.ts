@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       title: "Rate My Face Actions API",
       version: "2.5.1",
       description:
-        "Rate My Face Actions: FREE product links plus Stripe-credit-metered account learning with one-time signup_grant bootstrap. Ordinary chat is not storage. Explicit remember/consent → write Actions. Preference questions → read Actions. On 402 credits_required use createCreditCheckoutSession. Never invent prefs from ChatGPT Memory."
+        "Rate My Face Actions: FREE product links plus Stripe-credit-metered account learning (founder/signup grantCredits bootstrap). Ordinary chat is not storage. Explicit remember/consent → write Actions. Preference questions → read Actions. On 402 credits_required use createCreditCheckoutSession. Never invent prefs from ChatGPT Memory."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],

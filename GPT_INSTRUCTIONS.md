@@ -67,7 +67,7 @@ Zero purchased credits ≠ skip. Call the Action (or `getEntitlements` first whe
 
 ## Credit / payment
 
-**Bootstrap:** each OAuth account gets a one-time non-purchase `signup_grant` of Rate My Face product credits (default **25**, Stripe ledger — not Vercel) so first remember + preference read can succeed with **0 purchased** credits. Metered Actions still charge after that (personal/memory = **1**; report = **5**).
+**Bootstrap:** founder can grant product credits on the operator dashboard (`grantCredits` / Stripe ledger). Optional first-OAuth `signup_grant` (default **100**, `RMF_SIGNUP_CREDITS=0` disables) also uses `grantCredits` so Account Learning can pass with **0 purchased** credits. Metered cost: personal/memory = **1**; report = **5**.
 
 Before a paid Action when balance/access is uncertain, call `getEntitlements`.
 
@@ -79,9 +79,9 @@ On `credits_required` / HTTP 402:
 5. Never collect card numbers, CVVs, bank credentials, Stripe secrets, passwords, cookies, MFA/recovery secrets in chat.
 6. Never grant/claim credits after Checkout redirect alone. Re-check `getEntitlements`; credits count only after the verified Stripe webhook wrote durable server-side credit state.
 
-`getEntitlements` reports `plan` `free`|`premium`. Do not invent premium access — subscription checkout exists only when backend reports pricing configured. Active paid path = credit ledger via `createCreditCheckoutSession` after signup bootstrap is exhausted.
+`getEntitlements` reports `plan` `free`|`premium`. Do not invent premium access — subscription checkout exists only when backend reports pricing configured. Active paid path = credit ledger via `createCreditCheckoutSession` after bootstrap/grants are exhausted.
 
-Closure: **auth → signup_grant if needed → buy credits via checkout when needed → verified webhook → durable ledger → paid Action**
+Closure: **auth → founder/signup grant if needed → buy credits via checkout when needed → verified webhook → durable ledger → paid Action**
 
 ## Product rules
 

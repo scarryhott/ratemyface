@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     subscription_available: subscriptionAvailable,
     checkout_action: "createCreditCheckoutSession",
     note: subscriptionAvailable
-      ? "Credits meter paid persistence Actions. One-time signup_grant bootstrap is non-purchase. Premium subscription is also configured."
-      : "Credits meter paid persistence Actions. One-time signup_grant bootstrap is non-purchase. Premium subscription checkout is not configured (STRIPE_PRICE_ID_PREMIUM unset)."
+      ? "Credits meter paid persistence Actions via grantCredits/consumeCredits. Optional signup_grant is non-purchase. Premium subscription is also configured."
+      : "Credits meter paid persistence Actions via grantCredits/consumeCredits. Optional signup_grant is non-purchase. Premium subscription checkout is not configured (STRIPE_PRICE_ID_PREMIUM unset)."
   });
 }
