@@ -51,6 +51,12 @@ export function creditsPerPack(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
 }
 
+/** One-time non-purchase bootstrap so first remember + preference read can succeed with 0 purchased credits. */
+export function signupCredits(): number {
+  const parsed = Number.parseInt(process.env.RMF_SIGNUP_CREDITS || "25", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
+}
+
 export async function ensureBillingSchema(): Promise<void> {
   if (billingSchemaReady) return billingSchemaReady;
   billingSchemaReady = (async () => {
@@ -226,15 +232,25 @@ export async function creditBalance(userId: string): Promise<number> {
   return rows.length ? Number(rows[0].balance) : 0;
 }
 
+export type CreditGrantOptions = {
+  reason?: "purchase" | "signup_grant" | "operator_grant";
+  /** Purchased packs only; signup/operator grants stay off lifetime_purchased. */
+  countAsPurchased?: boolean;
+};
+
 export async function grantCredits(
   userId: string,
   amount: number,
   externalRef: string,
-  metadata: Record<string, unknown> = {}
+  metadata: Record<string, unknown> = {},
+  options: CreditGrantOptions = {}
 ): Promise<number> {
   if (!Number.isInteger(amount) || amount <= 0) throw new Error("invalid_credit_grant");
   await ensureBillingSchema();
   const sql = db();
+  const reason = options.reason || "purchase";
+  const countAsPurchased = options.countAsPurchased ?? reason === "purchase";
+  const purchasedDelta = countAsPurchased ? amount : 0;
 
   const existing = await sql`
     select balance_after
@@ -246,10 +262,10 @@ export async function grantCredits(
 
   const rows = await sql`
     insert into rmf_credit_accounts (user_id, balance, lifetime_purchased, updated_at)
-    values (${userId}, ${amount}, ${amount}, now())
+    values (${userId}, ${amount}, ${purchasedDelta}, now())
     on conflict (user_id) do update set
       balance = rmf_credit_accounts.balance + ${amount},
-      lifetime_purchased = rmf_credit_accounts.lifetime_purchased + ${amount},
+      lifetime_purchased = rmf_credit_accounts.lifetime_purchased + ${purchasedDelta},
       updated_at = now()
     returning balance
   `;
@@ -259,10 +275,125 @@ export async function grantCredits(
     insert into rmf_credit_ledger (
       user_id, delta, balance_after, reason, external_ref, metadata, created_at
     ) values (
-      ${userId}, ${amount}, ${balance}, 'purchase', ${externalRef}, ${sql.json(metadata as any)}, now()
+      ${userId}, ${amount}, ${balance}, ${reason}, ${externalRef}, ${sql.json(metadata as any)}, now()
     )
   `;
   return balance;
+}
+
+/** Idempotent one-time signup grant for Account Learning bootstrap (not a Stripe purchase). */
+export async function ensureSignupCreditGrant(userId: string): Promise<number> {
+  const amount = signupCredits();
+  return grantCredits(
+    userId,
+    amount,
+    `signup_grant:${userId}`,
+    { source: "account_learning_bootstrap", credits: amount },
+    { reason: "signup_grant", countAsPurchased: false }
+  );
+}
+
+/**
+ * Owner/operator adjust of Stripe-ledger product credits (founder/test grants).
+ * Positive delta grants; negative delta claws back without touching lifetime_spent usage totals.
+ */
+export async function adjustProductCredits(
+  userId: string,
+  delta: number,
+  externalRef: string,
+  metadata: Record<string, unknown> = {}
+): Promise<{ ok: boolean; balance: number; error?: string }> {
+  if (!Number.isInteger(delta) || delta === 0) {
+    return { ok: false, balance: await creditBalance(userId), error: "invalid_credit_adjust" };
+  }
+  await ensureBillingSchema();
+  const sql = db();
+
+  const existing = await sql`
+    select balance_after
+    from rmf_credit_ledger
+    where external_ref = ${externalRef}
+    limit 1
+  `;
+  if (existing.length) return { ok: true, balance: Number(existing[0].balance_after) };
+
+  if (delta > 0) {
+    const balance = await grantCredits(userId, delta, externalRef, metadata, {
+      reason: "operator_grant",
+      countAsPurchased: false
+    });
+    return { ok: true, balance };
+  }
+
+  const amount = -delta;
+  const rows = await sql`
+    insert into rmf_credit_accounts (user_id, balance, updated_at)
+    values (${userId}, 0, now())
+    on conflict (user_id) do update set updated_at = now()
+    returning balance
+  `;
+  const current = Number(rows[0]?.balance || 0);
+  if (current < amount) {
+    return { ok: false, balance: current, error: "insufficient_balance" };
+  }
+
+  const updated = await sql`
+    update rmf_credit_accounts
+    set balance = balance - ${amount},
+        updated_at = now()
+    where user_id = ${userId}
+      and balance >= ${amount}
+    returning balance
+  `;
+  if (!updated.length) {
+    return { ok: false, balance: await creditBalance(userId), error: "insufficient_balance" };
+  }
+  const balance = Number(updated[0].balance);
+  await sql`
+    insert into rmf_credit_ledger (
+      user_id, delta, balance_after, reason, external_ref, metadata, created_at
+    ) values (
+      ${userId}, ${delta}, ${balance}, 'operator_adjust', ${externalRef}, ${sql.json(metadata as any)}, now()
+    )
+  `;
+  return { ok: true, balance };
+}
+
+export async function creditAccountOverview(userId: string) {
+  await ensureBillingSchema();
+  const sql = db();
+  const accounts = await sql`
+    select user_id, balance, lifetime_purchased, lifetime_spent, updated_at
+    from rmf_credit_accounts
+    where user_id = ${userId}
+    limit 1
+  `;
+  const ledger = await sql`
+    select id, delta, balance_after, reason, action, external_ref, metadata, created_at
+    from rmf_credit_ledger
+    where user_id = ${userId}
+    order by created_at desc
+    limit 25
+  `;
+  const account = accounts[0] || null;
+  return {
+    user_id: userId,
+    balance: account ? Number(account.balance) : 0,
+    lifetime_purchased: account ? Number(account.lifetime_purchased) : 0,
+    lifetime_spent: account ? Number(account.lifetime_spent) : 0,
+    updated_at: account?.updated_at || null,
+    label: "Rate My Face product credits (Stripe ledger)",
+    recent_ledger: ledger.map((row: any) => ({
+      id: Number(row.id),
+      delta: Number(row.delta),
+      balance_after: Number(row.balance_after),
+      reason: String(row.reason),
+      action: row.action ? String(row.action) : null,
+      external_ref: row.external_ref ? String(row.external_ref) : null,
+      metadata: row.metadata || {},
+      created_at: row.created_at
+    }))
+  };
 }
 
 export async function consumeCredits(

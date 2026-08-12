@@ -31,6 +31,10 @@ The billing layer maintains subscription-compatible tables plus the active credi
 
 Current code defaults to 100 credits per pack and meters ordinary persistent memory/personal-network operations at 1 credit; reporting may cost more as declared by the endpoint.
 
+**Account Learning bootstrap:** each OAuth user receives a one-time non-purchase `signup_grant` (default 25 credits via `RMF_SIGNUP_CREDITS`) into `rmf_credit_ledger` on first OAuth code exchange and/or first metered Personal Network / memory Action. This is **not** a Stripe purchase (`lifetime_purchased` unchanged). It lets remember + preference read succeed with zero purchased credits. After the grant is spent, Actions return `credits_required` / HTTP 402 until a pack is bought or an operator grant is applied.
+
+**Operator grants:** `/operator/dashboard` → Grant / adjust product credits (Stripe ledger) calls `/api/operator/credits` to look up balances and apply positive/negative deltas (`operator_grant` / `operator_adjust`). Clearly labeled as Rate My Face product credits — not Vercel Hobby or AI Gateway.
+
 ## Stripe configuration
 
 Required for the active credit checkout/webhook closure:
@@ -67,7 +71,7 @@ If the Custom GPT still has an older schema containing `createCheckoutSession` o
 
 ## Operator dashboard
 
-`/operator/dashboard` (via `/api/operator/ops`) surfaces **Rate My Face product credits** (Stripe ledger): balances, pack size, metered costs, free vs premium entitlement counts, 30-day credit usage by Action, personal-profile / memory-context counts, and Stripe wiring flags. Premium is labeled “not configured” when `stripe_subscription_price_configured=false`.
+`/operator/dashboard` (via `/api/operator/ops` and `/api/operator/credits`) surfaces **Rate My Face product credits** (Stripe ledger): balances, pack size, signup bootstrap size, metered costs, free vs premium entitlement counts, 30-day credit usage by Action, personal-profile / memory-context counts, Stripe wiring flags, and owner grant/adjust controls. Premium is labeled “not configured” when `stripe_subscription_price_configured=false`.
 
 ### Do not confuse with Vercel balances
 

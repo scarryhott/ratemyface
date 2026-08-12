@@ -4,7 +4,9 @@ import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 import {
   MEMORY_CONTEXT_COST,
   creditsPerPack,
+  ensureSignupCreditGrant,
   getEntitlements,
+  signupCredits,
   stripeCreditsPriceConfigured,
   stripePriceConfigured,
   stripeSecretConfigured,
@@ -23,6 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
   }
 
+  await ensureSignupCreditGrant(user.id);
   const entitlements = await getEntitlements(user.id);
   const subscriptionAvailable = stripeSecretConfigured() && stripePriceConfigured();
   const creditCheckoutAvailable = stripeSecretConfigured() && stripeCreditsPriceConfigured() && stripeWebhookConfigured();
@@ -32,6 +35,7 @@ export async function GET(request: NextRequest) {
     plan: entitlements.premium ? "premium" : "free",
     ...entitlements,
     credit_pack_size: creditsPerPack(),
+    signup_bootstrap_credits: signupCredits(),
     metered_costs: {
       personal_network: PERSONAL_ACTION_COST,
       memory_context: MEMORY_CONTEXT_COST,
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
     subscription_available: subscriptionAvailable,
     checkout_action: "createCreditCheckoutSession",
     note: subscriptionAvailable
-      ? "Credits meter paid persistence Actions. Premium subscription is also configured."
-      : "Credits meter paid persistence Actions. Premium subscription checkout is not configured (STRIPE_PRICE_ID_PREMIUM unset)."
+      ? "Credits meter paid persistence Actions. One-time signup_grant bootstrap is non-purchase. Premium subscription is also configured."
+      : "Credits meter paid persistence Actions. One-time signup_grant bootstrap is non-purchase. Premium subscription checkout is not configured (STRIPE_PRICE_ID_PREMIUM unset)."
   });
 }

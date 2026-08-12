@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentOAuthUser } from "../../../lib/supabaseAuth";
-import { consumeCredits, creditBalance } from "../../../lib/stripeBilling";
+import { consumeCredits, creditBalance, ensureSignupCreditGrant } from "../../../lib/stripeBilling";
 import { PERSONAL_ACTION_COST, REPORT_ACTION_COST, connections, history, profile, recommendationFeedback, saveInteraction, saveRecommendation, savedItems, updateProfile } from "../../../lib/personalNetwork";
 
 export const runtime="nodejs";
 const denied=(balance:number,cost:number)=>NextResponse.json({ok:false,error:"credits_required",message:"Persistent Rate My Face personal network uses metered credits. The preference was not saved or loaded. Buy credits with createCreditCheckoutSession, then retry.",required_credits:cost,balance,checkout_action:"createCreditCheckoutSession"},{status:402});
 async function user(req:NextRequest){return currentOAuthUser(req)}
-async function charge(uid:string,cost:number,action:string){const r=await consumeCredits(uid,cost,action);return r.ok?null:denied(r.balance,cost)}
+async function charge(uid:string,cost:number,action:string){
+  await ensureSignupCreditGrant(uid);
+  const r=await consumeCredits(uid,cost,action);
+  return r.ok?null:denied(r.balance,cost);
+}
 
 export async function GET(req:NextRequest){
  const u=await user(req); if(!u)return NextResponse.json({ok:false,error:"oauth_required"},{status:401});
