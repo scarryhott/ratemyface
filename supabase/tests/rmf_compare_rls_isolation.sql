@@ -1,0 +1,31 @@
+-- Manual verification for Compare Me To Me RLS isolation.
+-- Apply after 20260812180000_create_rmf_compare_tables.sql.
+--
+-- Expected:
+--   authenticated + sub=UserA → own rows only
+--   authenticated + sub=UserA → UserB rows empty
+--   anon → permission denied
+--   postgres/table owner → full read/write
+--   Feature remains DISABLED in app (/api/health.compare_me_to_me.enabled=false)
+
+-- Example seed (server role):
+-- insert into rmf_compare_jobs (user_id, status, consent_compare) values
+--   ('11111111-1111-4111-8111-111111111111', 'queued', false),
+--   ('22222222-2222-4222-8222-222222222222', 'queued', false);
+
+-- As authenticated User A:
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+--   select user_id, status from rmf_compare_jobs;         -- expect only User A
+--   select user_id from rmf_compare_results;              -- expect only User A (or empty)
+--   insert into rmf_compare_jobs (user_id, status) values -- expect permission denied
+--     ('11111111-1111-4111-8111-111111111111', 'queued');
+-- rollback;
+
+-- As anon:
+-- begin;
+--   set local role anon;
+--   select * from rmf_compare_jobs;                       -- expect permission denied
+--   select * from rmf_compare_results;                    -- expect permission denied
+-- rollback;
