@@ -7,7 +7,8 @@ import {
   premiumPriceId,
   saveStripeCustomer,
   stripe,
-  stripeConfigured
+  stripePriceConfigured,
+  stripeSecretConfigured
 } from "../../../../lib/stripeBilling";
 
 export const runtime = "nodejs";
@@ -20,8 +21,18 @@ export async function POST(request: NextRequest) {
   if (!databaseConfigured()) {
     return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
   }
-  if (!stripeConfigured()) {
-    return NextResponse.json({ ok: false, error: "stripe_not_configured" }, { status: 503 });
+  // Premium subscription is legacy/optional. Active paid path is credit packs.
+  if (!stripeSecretConfigured() || !stripePriceConfigured()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "premium_subscription_not_configured",
+        message:
+          "Premium subscription checkout is not configured. Use createCreditCheckoutSession for Rate My Face credit packs.",
+        checkout_action: "createCreditCheckoutSession"
+      },
+      { status: 503 }
+    );
   }
 
   const entitlements = await getEntitlements(user.id);

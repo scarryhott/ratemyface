@@ -4,7 +4,7 @@ import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 import { consumeCredits, creditBalance, MEMORY_CONTEXT_COST } from "../../../../lib/stripeBilling";
 
 async function requireUser(request: NextRequest) { return currentOAuthUser(request); }
-function creditsRequired(balance: number) { return NextResponse.json({ ok: false, error: "credits_required", message: "Persistent Rate My Face memory uses metered credits.", required_credits: MEMORY_CONTEXT_COST, balance, checkout_action: "createCreditCheckoutSession" }, { status: 402 }); }
+function creditsRequired(balance: number) { return NextResponse.json({ ok: false, error: "credits_required", message: "Persistent Rate My Face memory uses metered credits. The preference was not saved or loaded. Buy credits with createCreditCheckoutSession, then retry.", required_credits: MEMORY_CONTEXT_COST, balance, checkout_action: "createCreditCheckoutSession" }, { status: 402 }); }
 async function charge(userId: string, action: string) { const result = await consumeCredits(userId, MEMORY_CONTEXT_COST, action); return result.ok ? null : creditsRequired(result.balance); }
 
 export async function POST(request: NextRequest) {
