@@ -65,7 +65,7 @@ Never collect raw card data in chat or GitHub, never store Stripe secrets in the
 The deployed OpenAPI v2.5.0 billing/persistence operations are:
 - `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs, `subscription_available`)
 - `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE
-- `getPersonalNetwork` — PAID (required for preference/memory questions)
+- `getPersonalNetwork` — PAID (REQUIRED first Action for preference/memory questions; OpenAPI 2.5.3+)
 - `updatePersonalNetwork` — PAID (required on explicit remember/consent)
 - `getUserContext` — PAID
 - `saveUserContext` — PAID

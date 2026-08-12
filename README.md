@@ -51,8 +51,20 @@ After deployment:
 1. Open `/api/openapi` on the production deployment and import/copy that schema into the GPT Action configuration.
 2. Configure Action authentication as a Bearer/API key using the same value stored in Vercel as `GPT_ACTION_SECRET`.
 3. Set the GPT privacy-policy URL to `/privacy` on the production deployment.
-4. Require the GPT to call `searchProduct` and render `affiliate_url` unchanged.
-5. If `link_type` is `product`, it may use the returned title/ASIN. If `link_type` is `amazon_search`, describe the link only as Amazon results for the recommendation.
+4. Paste `GPT_INSTRUCTIONS.md` into the Custom GPT Instructions editor (keep ≤7900 chars). The file leads with a MUST retrieve block so preference questions auto-call `getPersonalNetwork`.
+5. Require the GPT to call `searchProduct` and render `affiliate_url` unchanged.
+6. If `link_type` is `product`, it may use the returned title/ASIN. If `link_type` is `amazon_search`, describe the link only as Amazon results for the recommendation.
+
+### Conversation starters (paste in GPT editor)
+
+Exact starter text that helps Action selection for Account Learning:
+
+1. `What do you know about my preferences?`
+2. `Remember that I prefer a natural professional look and short beard`
+3. `How many Rate My Face credits do I have?`
+4. `Recommend a product for my look`
+
+Monitor check: a **new chat** with starter (1) should show Allow/consent for `getPersonalNetwork` without the user saying “Call getPersonalNetwork”.
 
 ## Deployment
 

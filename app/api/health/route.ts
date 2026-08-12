@@ -33,6 +33,11 @@ export async function GET() {
       status: "requires_account_learning",
       note: "Scaffold only. Ship after consented Personal Network read/write is verified in production."
     },
+    account_learning: {
+      openapi_version: "2.5.3",
+      profile_empty_shape: "found=false + preferences={}",
+      retrieve_action: "getPersonalNetwork"
+    },
     partner_tag: "ratemyfacegpt-20"
   });
 }
