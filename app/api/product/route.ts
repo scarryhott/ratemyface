@@ -5,6 +5,7 @@ const PARTNER_TAG = "ratemyfacegpt-20";
 const MARKETPLACE = "www.amazon.com";
 const TOKEN_URL = "https://api.amazon.com/auth/o2/token";
 const SEARCH_URL = "https://creatorsapi.amazon/catalog/v1/searchItems";
+const ASIN_PATTERN = /^[A-Z0-9]{10}$/i;
 
 type TokenCache = { token: string; expiresAt: number } | null;
 let tokenCache: TokenCache = null;
@@ -28,11 +29,71 @@ function budgetToCents(value: unknown): number | undefined {
   return Math.round(parsed * 100);
 }
 
+/** Case-insensitive token dedupe; preserves first-seen casing and order. */
+function dedupeTokens(text: string): string {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  for (const token of text.split(/\s+/)) {
+    if (!token) continue;
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tokens.push(token);
+  }
+  return tokens.join(" ");
+}
+
+/**
+ * Build a clean Amazon keywords string from brand / product_type / concern
+ * without repeating brand or concern tokens already present in other fields.
+ */
+function buildKeywords(brand: string, productType: string, concern: string): string {
+  return dedupeTokens([brand, productType, concern].filter(Boolean).join(" ")).slice(0, 180);
+}
+
+function isValidAsin(value: unknown): value is string {
+  return typeof value === "string" && ASIN_PATTERN.test(value.trim());
+}
+
+function isAmazonHostname(hostname: string): boolean {
+  return hostname === "amazon.com" || hostname.endsWith(".amazon.com");
+}
+
+function taggedDpUrl(asin: string): string {
+  const url = new URL(`https://www.amazon.com/dp/${asin.trim()}`);
+  url.searchParams.set("tag", PARTNER_TAG);
+  return url.toString();
+}
+
 function taggedSearchUrl(keywords: string): string {
   const url = new URL("https://www.amazon.com/s");
   url.searchParams.set("k", keywords);
   url.searchParams.set("tag", PARTNER_TAG);
   return url.toString();
+}
+
+/** Ensure partner tag is present on an Amazon product URL; returns null if unusable. */
+function ensurePartnerTag(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    if (!isAmazonHostname(url.hostname)) return null;
+    url.searchParams.set("tag", PARTNER_TAG);
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Prefer ASIN /dp/ links; otherwise use detailPageURL with tag ensured.
+ * Returns null when neither yields a usable product URL (caller falls back to search).
+ */
+function resolveAffiliateUrl(asin: unknown, detailPageURL: unknown): string | null {
+  if (isValidAsin(asin)) return taggedDpUrl(asin);
+  if (typeof detailPageURL === "string" && detailPageURL.trim()) {
+    return ensurePartnerTag(detailPageURL.trim());
+  }
+  return null;
 }
 
 function fallbackResponse(keywords: string, reason: string) {
@@ -78,6 +139,23 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+/** Accept items with a usable ASIN; do not require a pre-tagged detailPageURL. */
+function isAcceptableProduct(candidate: any): boolean {
+  if (!isValidAsin(candidate?.asin)) return false;
+
+  const detail = typeof candidate?.detailPageURL === "string" ? candidate.detailPageURL.trim() : "";
+  if (!detail) return true; // ASIN alone is enough to build /dp/{ASIN}
+
+  try {
+    const url = new URL(detail);
+    // Prefer amazon.com product URLs; reject clearly non-Amazon hosts.
+    return isAmazonHostname(url.hostname);
+  } catch {
+    // Malformed detail URL — still accept when ASIN is usable.
+    return true;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!(await actionOrOAuthAuthorized(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -100,7 +178,7 @@ export async function POST(request: NextRequest) {
   const brand = clean(input.brand, 80);
   if (!productType) return NextResponse.json({ ok: false, error: "product_type_required" }, { status: 400 });
 
-  const keywords = [brand, productType, concern].filter(Boolean).join(" ").slice(0, 180);
+  const keywords = buildKeywords(brand, productType, concern);
   const maxPrice = budgetToCents(input.budget);
   const amazonConfigured = Boolean(process.env.AMAZON_CREATORS_CLIENT_ID && process.env.AMAZON_CREATORS_CLIENT_SECRET);
   if (!amazonConfigured) return fallbackResponse(keywords, "creators_api_not_configured");
@@ -136,28 +214,24 @@ export async function POST(request: NextRequest) {
     }
 
     const items = Array.isArray(data?.searchResult?.items) ? data.searchResult.items : [];
-    const item = items.find((candidate: any) => {
-      if (!candidate?.asin || !candidate?.detailPageURL) return false;
-      try {
-        const url = new URL(candidate.detailPageURL);
-        return url.hostname.endsWith("amazon.com") && url.searchParams.get("tag") === PARTNER_TAG;
-      } catch {
-        return false;
-      }
-    });
+    const item = items.find(isAcceptableProduct);
 
     if (!item) return fallbackResponse(keywords, "no_vended_product_link");
+
+    const affiliateUrl = resolveAffiliateUrl(item.asin, item.detailPageURL);
+    if (!affiliateUrl) return fallbackResponse(keywords, "no_vended_product_link");
 
     const title = item?.itemInfo?.title?.displayValue;
     const imageUrl = item?.images?.primary?.medium?.url;
     const price = item?.offersV2?.listings?.[0]?.price;
+    const asin = isValidAsin(item.asin) ? item.asin.trim().toUpperCase() : null;
 
     return NextResponse.json({
       ok: true,
       link_type: "product",
-      asin: item.asin,
+      asin,
       title: typeof title === "string" ? title : null,
-      affiliate_url: item.detailPageURL,
+      affiliate_url: affiliateUrl,
       image_url: typeof imageUrl === "string" ? imageUrl : null,
       price: price ?? null,
       partner_tag: PARTNER_TAG,
