@@ -29,7 +29,8 @@ async function readBillingOverview(tx: any) {
     credits_per_pack: creditsPerPack(),
     metered_personal_cost: PERSONAL_ACTION_COST,
     metered_memory_cost: MEMORY_CONTEXT_COST,
-    report_cost: REPORT_ACTION_COST
+    report_cost: REPORT_ACTION_COST,
+    label: productCreditLabel()
   };
   const stripe = {
     secret_configured: stripeSecretConfigured(),
@@ -60,7 +61,7 @@ async function readBillingOverview(tx: any) {
       created_at: string;
     }>,
     revenue_mapping:
-      "Paid persistence Actions consume credits (personal/memory=1, report=5). Users buy packs via createCreditCheckoutSession. Premium subscription UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
+      "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory=1, report=5); packs via createCreditCheckoutSession → webhook → rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
   };
 
   const hasCredits = await tableExists(tx, "rmf_credit_accounts");
@@ -191,7 +192,41 @@ async function readBillingOverview(tx: any) {
     memory_contexts,
     usage_by_action_30d,
     recent_credit_ledger,
-    revenue_mapping: `Paid persistence (get/update Personal Network, legacy memory) consumes ${PERSONAL_ACTION_COST} credit per Action (report=${REPORT_ACTION_COST}). Credit packs=${creditsPerPack()} via createCreditCheckoutSession → Stripe webhook → rmf_credit_ledger. ${premiumNote}`
+    revenue_mapping: `PRODUCT ${productCreditLabel()}: persistence Actions consume ${PERSONAL_ACTION_COST} credit (report=${REPORT_ACTION_COST}); packs=${creditsPerPack()} via createCreditCheckoutSession → Stripe webhook → rmf_credit_ledger. Not Vercel Hobby / AI Gateway. ${premiumNote}`
+  };
+}
+
+function productCreditLabel() {
+  return "Rate My Face product credits (Stripe ledger)";
+}
+
+/** Vercel hosting / AI Gateway are infrastructure — never product business credits. */
+export function infrastructureCreditBoundary() {
+  return {
+    vercel_hosting: {
+      plan: "Hobby",
+      status: "Active",
+      payment_methods: "none",
+      note: "Vercel team hosting plan only. Not Rate My Face product credits. Operator reference from live Vercel check; not live-polled by this API."
+    },
+    vercel_ai_gateway: {
+      balance_usd: 0,
+      auto_reload: false,
+      note: "Vercel AI Gateway USD balance is infrastructure spend for model calls. Do NOT treat as Rate My Face product credits, packs, entitlements, or checkout."
+    },
+    product_credits: {
+      system: "stripe_metered",
+      label: productCreditLabel(),
+      credits_per_pack: creditsPerPack(),
+      metered_memory_cost: MEMORY_CONTEXT_COST,
+      metered_personal_cost: PERSONAL_ACTION_COST,
+      report_cost: REPORT_ACTION_COST,
+      checkout_action: "createCreditCheckoutSession",
+      entitlements: "free vs premium (premium only when STRIPE_PRICE_ID_PREMIUM + verified webhook)",
+      note: "Sole product business credit system managed by this dashboard and GPT Actions."
+    },
+    nodejs_runtime_note:
+      "Vercel sidebar may show Node.js 20 warnings on projects — optional infra note only; unrelated to product credit packs."
   };
 }
 
@@ -201,7 +236,8 @@ function billingFromEnvOnly() {
       credits_per_pack: creditsPerPack(),
       metered_personal_cost: PERSONAL_ACTION_COST,
       metered_memory_cost: MEMORY_CONTEXT_COST,
-      report_cost: REPORT_ACTION_COST
+      report_cost: REPORT_ACTION_COST,
+      label: productCreditLabel()
     },
     stripe: {
       secret_configured: stripeSecretConfigured(),
@@ -227,7 +263,8 @@ function billingFromEnvOnly() {
       action: string | null;
       created_at: string;
     }>,
-    revenue_mapping: "Database not configured; showing Stripe/env credit model only."
+    revenue_mapping:
+      "Database not configured; showing Stripe/env Rate My Face product credit model only. Separate from Vercel Hobby and AI Gateway USD."
   };
 }
 
@@ -243,6 +280,7 @@ export async function getOperatorOpsRead() {
       portfolio: { active_gpts: 0, draft_gpts: 0, public_gpts: 0, action_gpts: 0, amazon_linked_gpts: 0 },
       commerce: { amazon: null },
       billing,
+      infrastructure: infrastructureCreditBoundary(),
       projects: [],
       recent_runs: [],
       recent_signals: [],
@@ -252,6 +290,14 @@ export async function getOperatorOpsRead() {
       recent_approvals: [],
       external_metrics: {
         amazon_associates: { status: "snapshot_unavailable", note: "No stored Amazon Associates snapshot is available." },
+        vercel_hosting: {
+          status: "hobby_active",
+          note: infrastructureCreditBoundary().vercel_hosting.note
+        },
+        vercel_ai_gateway: {
+          status: "not_product_credits",
+          note: infrastructureCreditBoundary().vercel_ai_gateway.note
+        },
         vercel_analytics: { status: "connect_later", note: "Live Vercel analytics are not persisted in Postgres yet." },
         railway_browser: {
           status: process.env.RMF_BROWSER_CONTROL_URL ? "configured" : "connect_later",
@@ -259,7 +305,7 @@ export async function getOperatorOpsRead() {
             ? "Browser control URL is configured; live Railway metrics are not ingested into Postgres yet."
             : "Railway browser control is not configured."
         },
-        stripe_credits: {
+        stripe_product_credits: {
           status: billing.stripe.secret_configured && billing.stripe.credit_price_configured && billing.stripe.webhook_configured ? "configured" : "partial",
           note: billing.revenue_mapping
         }
@@ -346,6 +392,7 @@ export async function getOperatorOpsRead() {
       },
       commerce: { amazon },
       billing,
+      infrastructure: infrastructureCreditBoundary(),
       projects: projects.map((r: any) => ({ ...r, id: Number(r.id), updated_at: String(r.updated_at) })),
       recent_runs: recentRuns.map((r: any) => ({
         ...r,
@@ -399,6 +446,14 @@ export async function getOperatorOpsRead() {
         amazon_associates: amazon
           ? { status: "snapshot", note: `Stored Amazon Associates snapshot through ${String((amazon as any).period_end || "unknown date")}.` }
           : { status: "snapshot_unavailable", note: "No stored Amazon Associates snapshot is available." },
+        vercel_hosting: {
+          status: "hobby_active",
+          note: infrastructureCreditBoundary().vercel_hosting.note
+        },
+        vercel_ai_gateway: {
+          status: "not_product_credits",
+          note: infrastructureCreditBoundary().vercel_ai_gateway.note
+        },
         vercel_analytics: { status: "connect_later", note: "Live Vercel analytics are not persisted in Postgres yet." },
         railway_browser: {
           status: process.env.RMF_BROWSER_CONTROL_URL ? "configured" : "connect_later",
@@ -406,7 +461,7 @@ export async function getOperatorOpsRead() {
             ? "Browser control URL is configured; live Railway metrics are not ingested into Postgres yet."
             : "Railway browser control is not configured."
         },
-        stripe_credits: {
+        stripe_product_credits: {
           status:
             billing.stripe.secret_configured &&
             billing.stripe.credit_price_configured &&

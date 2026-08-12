@@ -67,4 +67,14 @@ If the Custom GPT still has an older schema containing `createCheckoutSession` o
 
 ## Operator dashboard
 
-`/operator/dashboard` (via `/api/operator/ops`) surfaces credit balances, pack size, metered costs, free vs premium entitlement counts, 30-day credit usage by Action, personal-profile / memory-context counts, and Stripe wiring flags. Premium is labeled “not configured” when `stripe_subscription_price_configured=false`.
+`/operator/dashboard` (via `/api/operator/ops`) surfaces **Rate My Face product credits** (Stripe ledger): balances, pack size, metered costs, free vs premium entitlement counts, 30-day credit usage by Action, personal-profile / memory-context counts, and Stripe wiring flags. Premium is labeled “not configured” when `stripe_subscription_price_configured=false`.
+
+### Do not confuse with Vercel balances
+
+| System | What it is | Managed as product credits? |
+|---|---|---|
+| Stripe RMF credits (`rmf_credit_*`, packs of 100, metered Action cost 1) | Customer-facing persistence meter + checkout via `createCreditCheckoutSession` | **Yes** |
+| Vercel hosting plan (Hobby, Active, no payment methods) | Team hosting quotas | **No** |
+| Vercel AI Gateway credit (USD balance / auto-reload) | Infrastructure model spend | **No** |
+
+The ops payload includes an `infrastructure` boundary object so the business dashboard can show Vercel Hobby / AI Gateway as separate infra context without mixing them into the product ledger.

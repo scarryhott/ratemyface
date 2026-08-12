@@ -18,6 +18,7 @@ type BillingOverview = {
     metered_personal_cost: number;
     metered_memory_cost: number;
     report_cost: number;
+    label?: string;
   };
   stripe?: {
     secret_configured: boolean;
@@ -45,6 +46,22 @@ type BillingOverview = {
   }>;
   revenue_mapping?: string;
 };
+type InfrastructureBoundary = {
+  vercel_hosting?: { plan: string; status: string; payment_methods: string; note: string };
+  vercel_ai_gateway?: { balance_usd: number; auto_reload: boolean; note: string };
+  product_credits?: {
+    system: string;
+    label: string;
+    credits_per_pack: number;
+    metered_memory_cost: number;
+    metered_personal_cost: number;
+    report_cost: number;
+    checkout_action: string;
+    entitlements: string;
+    note: string;
+  };
+  nodejs_runtime_note?: string;
+};
 type OpsOverview = {
   ok: boolean;
   database_configured?: boolean;
@@ -56,6 +73,7 @@ type OpsOverview = {
   portfolio?: { active_gpts: number; draft_gpts: number; public_gpts: number; action_gpts: number; amazon_linked_gpts: number };
   commerce?: { amazon: Record<string, unknown> | null };
   billing?: BillingOverview;
+  infrastructure?: InfrastructureBoundary;
   projects?: Array<{ id: number; slug: string; name: string; repository: string | null; status: string; updated_at: string }>;
   recent_runs?: Array<{ id: number; model: string | null; authority: number; status: string; closure_state: string | null; error: string | null; created_at: string }>;
   recent_signals?: Array<{ id: number; source: string; kind: string; status: string; requested_authority: number; created_at: string }>;
@@ -123,6 +141,7 @@ export default function OperatorBusinessDashboard() {
   const portfolio = data?.portfolio;
   const accounts = data?.accounts;
   const billing = data?.billing;
+  const infrastructure = data?.infrastructure;
   const stripe = billing?.stripe;
   const creditModel = billing?.credit_model;
   const gpts = data?.gpts || [];
@@ -132,6 +151,7 @@ export default function OperatorBusinessDashboard() {
   const oauthUsers = accounts?.oauth_users || 0;
   const premiumActive = billing?.premium_entitlements_active || 0;
   const freePlanUsers = Math.max(oauthUsers - premiumActive, 0);
+  const productCreditLabel = creditModel?.label || infrastructure?.product_credits?.label || "Rate My Face product credits (Stripe ledger)";
 
   return (
     <main style={{ maxWidth: 1240, margin: "0 auto", paddingBottom: 60 }}>
@@ -139,7 +159,10 @@ export default function OperatorBusinessDashboard() {
         <div>
           <p style={{ marginBottom: 8 }}><a href="/operator">← Operator console</a></p>
           <h1 style={{ margin: 0, fontSize: 36 }}>Rate My Face Business</h1>
-          <p className="muted" style={{ maxWidth: 760 }}>Owner-only control center for GPT portfolio, accounts, commerce, agent operations, and infrastructure-backed business state.</p>
+          <p className="muted" style={{ maxWidth: 760 }}>
+            Owner-only control center for GPT portfolio, accounts, commerce, Stripe-metered product credits, and agent operations.
+            Vercel Hobby / AI Gateway balances are hosting infrastructure — not product credits.
+          </p>
         </div>
         <div style={{ ...pill, background: data?.database_configured ? "#ecfdf3" : "#fff7ed", color: data?.database_configured ? "#067647" : "#b54708" }}>{businessHealth}</div>
       </div>
@@ -164,11 +187,15 @@ export default function OperatorBusinessDashboard() {
         <section style={grid4}>
           <Metric label="GPT portfolio" value={data.counts?.gpts} note={`${portfolio?.active_gpts || 0} active · ${portfolio?.public_gpts || 0} public`} />
           <Metric label="Accounts" value={accounts?.auth_users} note={`${accounts?.oauth_users || 0} GPT OAuth linked`} />
-          <Metric label="Credit balance · total" value={billing?.total_credit_balance} note={`${num(billing?.accounts_with_balance)} accounts with balance`} />
-          <Metric label="Credits spent · lifetime" value={billing?.lifetime_spent} note={`${num(billing?.lifetime_purchased)} purchased`} />
+          <Metric label="RMF product credits · total" value={billing?.total_credit_balance} note={`${num(billing?.accounts_with_balance)} Stripe ledger accounts with balance`} />
+          <Metric label="RMF credits spent · lifetime" value={billing?.lifetime_spent} note={`${num(billing?.lifetime_purchased)} purchased via Stripe packs`} />
         </section>
 
-        <h2 style={sectionTitle}>Credits, plan & persistence revenue</h2>
+        <h2 style={sectionTitle}>Product credits (Stripe) — not Vercel</h2>
+        <p className="muted" style={{ marginTop: -4, marginBottom: 12, maxWidth: 900 }}>
+          {productCreditLabel}. Managed here and by GPT Actions (<code>getEntitlements</code> / <code>createCreditCheckoutSession</code>).
+          Do not confuse with Vercel Hobby quotas or Vercel AI Gateway USD.
+        </p>
         <section style={grid4}>
           <Metric label="Pack size" value={creditModel?.credits_per_pack ?? 100} note="createCreditCheckoutSession" />
           <Metric label="Metered Action cost" value={creditModel?.metered_personal_cost ?? 1} note={`memory ${creditModel?.metered_memory_cost ?? 1} · report ${creditModel?.report_cost ?? 5}`} />
@@ -179,7 +206,7 @@ export default function OperatorBusinessDashboard() {
         <section style={{ ...grid2, marginTop: 16 }}>
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Plan & Stripe wiring</h2>
-            <div style={funnelRow}><span>Active paid path</span><strong>Credits (packs of {creditModel?.credits_per_pack ?? 100})</strong></div>
+            <div style={funnelRow}><span>Active paid path</span><strong>RMF product credits (packs of {creditModel?.credits_per_pack ?? 100})</strong></div>
             <div style={funnelRow}><span>Credit price configured</span><strong>{stripe?.credit_price_configured ? "yes" : "no"}</strong></div>
             <div style={funnelRow}><span>Webhook configured</span><strong>{stripe?.webhook_configured ? "yes" : "no"}</strong></div>
             <div style={funnelRow}><span>Secret configured</span><strong>{stripe?.secret_configured ? "yes" : "no"}</strong></div>
@@ -190,28 +217,53 @@ export default function OperatorBusinessDashboard() {
             <div style={funnelRow}><span>Billing accounts</span><strong>{num(billing?.billing_accounts)}</strong></div>
             {!premiumConfigured && (
               <p className="muted" style={{ marginBottom: 0 }}>
-                Premium subscription checkout is disabled until <code>STRIPE_PRICE_ID_PREMIUM</code> is set. Do not advertise premium as available. Paid persistence maps to credit spend only.
+                Premium subscription checkout is disabled until <code>STRIPE_PRICE_ID_PREMIUM</code> is set. Do not advertise premium as available. Paid persistence maps to Stripe RMF credit spend only.
               </p>
             )}
             {premiumConfigured && (
               <p className="muted" style={{ marginBottom: 0 }}>
-                Premium rows count only verified Stripe subscription entitlements. Credits remain the meter for Personal Network / memory Actions.
+                Premium rows count only verified Stripe subscription entitlements. Stripe RMF credits remain the meter for Personal Network / memory Actions.
               </p>
             )}
           </div>
           <div className="card">
+            <h2 style={{ marginTop: 0 }}>Vercel infrastructure (not product credits)</h2>
+            <div style={funnelRow}><span>Hosting plan</span><strong>{infrastructure?.vercel_hosting?.plan || "Hobby"} · {infrastructure?.vercel_hosting?.status || "Active"}</strong></div>
+            <div style={funnelRow}><span>Payment methods</span><strong>{infrastructure?.vercel_hosting?.payment_methods || "none"}</strong></div>
+            <div style={funnelRow}><span>AI Gateway balance</span><strong>{money(infrastructure?.vercel_ai_gateway?.balance_usd ?? 0)}</strong></div>
+            <div style={funnelRow}><span>AI Gateway auto-reload</span><strong>{infrastructure?.vercel_ai_gateway?.auto_reload ? "On" : "Off"}</strong></div>
+            <p className="muted" style={{ marginBottom: 8 }}>
+              {infrastructure?.vercel_ai_gateway?.note || "Vercel AI Gateway USD is not Rate My Face product credits."}
+            </p>
+            <p className="muted" style={{ marginBottom: 0 }}>
+              {infrastructure?.nodejs_runtime_note || "Node.js 20 Vercel sidebar warnings are optional infra notes only."}
+            </p>
+          </div>
+        </section>
+
+        <section style={{ ...grid2, marginTop: 16 }}>
+          <div className="card">
             <h2 style={{ marginTop: 0 }}>Metered Action usage · 30d</h2>
             {!billing?.usage_by_action_30d?.length ? (
-              <p className="muted">No credit ledger usage in the last 30 days yet.</p>
+              <p className="muted">No Stripe RMF credit ledger usage in the last 30 days yet.</p>
             ) : (
               billing.usage_by_action_30d.map((row) => (
                 <div key={row.action} style={funnelRow}>
                   <span><code>{row.action}</code> · {num(row.events)} events</span>
-                  <strong>{num(row.credits_spent)} credits</strong>
+                  <strong>{num(row.credits_spent)} RMF credits</strong>
                 </div>
               ))
             )}
-            <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>{billing?.revenue_mapping || "Paid persistence consumes credits after verified Stripe purchase."}</p>
+            <p className="muted" style={{ marginBottom: 0, marginTop: 12 }}>{billing?.revenue_mapping || "Paid persistence consumes Stripe RMF credits after verified purchase."}</p>
+          </div>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Product vs infra cheat-sheet</h2>
+            <div style={funnelRow}><span>Customer persistence meter</span><strong>Stripe RMF credits</strong></div>
+            <div style={funnelRow}><span>Checkout Action</span><strong>createCreditCheckoutSession</strong></div>
+            <div style={funnelRow}><span>Entitlements</span><strong>free vs premium (premium env-gated)</strong></div>
+            <div style={funnelRow}><span>Vercel Hobby</span><strong>hosting only</strong></div>
+            <div style={funnelRow}><span>Vercel AI Gateway</span><strong>infra USD — ignore for product ledger</strong></div>
+            <p className="muted" style={{ marginBottom: 0 }}>{infrastructure?.product_credits?.note}</p>
           </div>
         </section>
 
@@ -238,7 +290,7 @@ export default function OperatorBusinessDashboard() {
 
         {!!billing?.recent_credit_ledger?.length && (
           <section className="card" style={{ marginTop: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Recent credit ledger</h2>
+            <h2 style={{ marginTop: 0 }}>Recent Stripe RMF credit ledger</h2>
             <div className="tableWrap">
               <table className="opsTable">
                 <thead>
@@ -295,7 +347,7 @@ export default function OperatorBusinessDashboard() {
           <Status label="Database" state={data.database_configured ? "Connected" : "Not configured"} ok={Boolean(data.database_configured)} />
           <Status label="Owner auth" state={owner ? "Google session active" : "Not signed in"} ok={Boolean(owner)} />
           <Status
-            label="Credit checkout"
+            label="Stripe RMF credits"
             state={
               stripe?.secret_configured && stripe?.credit_price_configured && stripe?.webhook_configured
                 ? "Secret + price + webhook"
@@ -305,7 +357,7 @@ export default function OperatorBusinessDashboard() {
           />
           <Status
             label="Premium subscription"
-            state={premiumConfigured ? "Price configured" : "Not configured — credits only"}
+            state={premiumConfigured ? "Price configured" : "Not configured — RMF credits only"}
             ok={premiumConfigured}
           />
         </section>
