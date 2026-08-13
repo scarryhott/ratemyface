@@ -115,8 +115,8 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
 }
 
 type AppearanceAgentControl = {
-  status: "DISABLED" | "TESTING" | "LIVE";
-  enabled: false;
+  status: "DISABLED" | "TESTING" | "LIVE" | "PAID";
+  enabled: boolean;
   plans_total: MetricValue;
   plans_draft: MetricValue;
   plans_active: MetricValue;
@@ -127,6 +127,7 @@ type AppearanceAgentControl = {
   note: string;
   target_days: number;
   depends_on: string[];
+  action_path?: string;
 };
 
 export function AppearanceAgentSection({ data }: { data: AppearanceAgentControl }) {
@@ -152,14 +153,15 @@ export function AppearanceAgentSection({ data }: { data: AppearanceAgentControl 
           </span>
           <span className="muted">
             enabled={String(data.enabled)} · schema=
-            {data.schema_ready ? "ready" : "pending"} · {data.target_days}-day loop · tables:{" "}
-            {data.future_tables.join(", ")}
+            {data.schema_ready ? "ready" : "pending"} · {data.target_days}-day loop · action=
+            {data.action_path || "/api/appearance"} · tables: {data.future_tables.join(", ")}
           </span>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          <strong>Not LIVE paid coaching.</strong> {data.note} Depends on:{" "}
-          {data.depends_on.join(", ")}. Plan/check-in counts are live empties (expect 0) or
-          Unavailable — no fake numbers. Credits will meter future paid ops.
+          Paid appearancePlan / appearanceCheckin Actions (OAuth + credits). Status{" "}
+          <strong>PAID</strong> is not a LIVE unlimited-coaching marketing claim. Unauthenticated
+          appearance is not free. Depends on: {data.depends_on.join(", ")}. Plan/check-in counts
+          are live table rows — never invented.
         </p>
         <section style={grid4}>
           <MetricCard label="Plans (total)" metric={data.plans_total} />

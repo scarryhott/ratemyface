@@ -101,19 +101,18 @@ describe("rmf appearance agent RLS migration (policy matrix)", () => {
   });
 });
 
-describe("appearance agent feature gate stays off", () => {
-  it("APPEARANCE_AGENT.enabled is false", () => {
-    assert.equal(APPEARANCE_AGENT.enabled, false);
-    assert.equal(APPEARANCE_AGENT.status, "requires_compare_and_learning");
-    assert.equal(APPEARANCE_AGENT.dashboard_status, "DISABLED");
+describe("appearance agent feature gate is paid, not LIVE coaching", () => {
+  it("APPEARANCE_AGENT.enabled is true with PAID status", () => {
+    assert.equal(APPEARANCE_AGENT.enabled, true);
+    assert.equal(APPEARANCE_AGENT.status, "paid");
+    assert.equal(APPEARANCE_AGENT.dashboard_status, "PAID");
     assert.equal(APPEARANCE_AGENT.target_days, 90);
   });
 
-  it("health route still reports appearance agent disabled via gate constant", () => {
+  it("health route reports appearance agent via gate constant without a LIVE claim", () => {
     const health = readFileSync(HEALTH, "utf8");
     assert.match(health, /appearance_agent/);
-    assert.match(health, /FEATURE REMAINS DISABLED/);
-    assert.match(health, /not LIVE paid coaching/i);
+    assert.match(health, /not a LIVE coaching claim/i);
     assert.match(health, /enabled:\s*APPEARANCE_AGENT\.enabled/);
     assert.match(health, /status:\s*APPEARANCE_AGENT\.status/);
     assert.match(health, /from ["'].*appearanceAgent["']/);

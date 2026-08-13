@@ -149,3 +149,15 @@ Append one concise entry per material experiment.
 - **Change made:** paid Compare Action on credits; public jobs listing stays 503; Appearance/social flags unchanged; affiliate/searchProduct untouched; GPT_INSTRUCTIONS.md not modified
 - **Rollback:** revert this commit and re-import prior OpenAPI 2.5.4
 - **Next:** re-import `/api/openapi` (do not paste GPT instructions); run consented compare with before/after image URLs
+
+### 2026-08-13 — Subscription feature = Appearance Agent Action on the same credit
+- **Surface:** GPT OpenAPI Action + Vercel API + Stripe credit ledger
+- **Hypothesis:** Shipping Appearance as authenticated, credit-metered OpenAPI Actions (honest 90-day plan/check-ins from Account Learning + Compare history) is the remaining subscription feature on the same 1-credit unit; instruction rewrites are not required.
+- **Variant A:** `/api/appearance*` 503 stubs / `enabled=false` / `requires_compare_and_learning`
+- **Variant B:** `appearancePlan` + `appearanceCheckin` Actions — OAuth + `consumeCredits` (1, same unit as Personal Network and Compare) + `consent_appearance=true` + required history; 400 if history/plan missing; no invented coaching or medical claims
+- **Metric:** authenticated plan/check-in consumes credits and persists `rmf_appearance_plans` + `rmf_appearance_checkins`; unauthenticated appearance is not free; `getEntitlements.metered_costs.appearance_agent=1` (same as personal_network / compare_me_to_me)
+- **Evidence/source:** OpenAPI 2.5.6 `appearancePlan` / `appearanceCheckin`; existing appearance tables/RLS; same Stripe ledger and 1-credit unit as Personal Network
+- **Result:** pending deploy + one authenticated Action call with Account Learning + Compare history
+- **Change made:** paid Appearance Actions on credits; social stays `not_configured`; affiliate/searchProduct untouched; GPT_INSTRUCTIONS.md not modified; report stays 5
+- **Rollback:** revert this commit and re-import prior OpenAPI 2.5.5
+- **Next:** re-import `/api/openapi` (do not paste GPT instructions); run consented appearancePlan then appearanceCheckin after Compare history exists

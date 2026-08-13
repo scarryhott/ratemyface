@@ -255,7 +255,7 @@ export function AgentConsoleSection({
               resize: "vertical",
               marginBottom: 8
             }}
-            placeholder="Ask the agent about bottlenecks, credits, Account Learning, or next experiments… (Appearance Agent / Compare stay DISABLED — not LIVE)"
+            placeholder="Ask the agent about bottlenecks, credits, Account Learning, or next experiments… (Compare / Appearance are PAID Actions — not LIVE unlimited coaching)"
           />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button style={button} disabled={!canOperate || busy || !message.trim()} onClick={() => void sendChat()}>

@@ -2,7 +2,7 @@
  * Compare Me To Me — paid authenticated OpenAPI Action.
  *
  * Unauthenticated / anonymous compare is not a product (401 on /api/compare,
- * 503 on /api/compare/jobs). Appearance Agent stays off. Vision is attempted
+ * 503 on /api/compare/jobs). Vision is attempted
  * when fetchable https image refs exist; dashboard must not claim LIVE if
  * vision is limited.
  *
@@ -17,7 +17,7 @@ export const COMPARE_ME_TO_ME = {
   dashboard_status: "PAID" as const,
   vision_status: "limited" as const,
   note: "Paid compareMeToMe Action (OAuth + 1 credit, same unit as Personal Network, + consent_compare + real before/after image refs). Vision runs when https image URLs are fetchable via AI Gateway; otherwise the result is an honest limited compare. Not a free public product and not a LIVE unlimited-vision claim.",
-  gate: "Paid OpenAPI Action at POST /api/compare. Unauthenticated callers get 401. Job listing stays 503. Requires consent_compare=true and real image refs (4xx if missing — never placeholder-as-real). Vision limited. Appearance Agent stays off. Cost is PERSONAL_ACTION_COST (1), not a vision surcharge.",
+  gate: "Paid OpenAPI Action at POST /api/compare. Unauthenticated callers get 401. Job listing stays 503. Requires consent_compare=true and real image refs (4xx if missing — never placeholder-as-real). Vision limited. Cost is PERSONAL_ACTION_COST (1), not a vision surcharge.",
   tables: ["rmf_compare_jobs", "rmf_compare_results"] as const,
   action_path: "/api/compare" as const,
   authenticated_test_path: "/api/compare/test" as const,

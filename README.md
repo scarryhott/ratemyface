@@ -23,16 +23,16 @@ The backend never invents ASINs.
 - `GET|POST /api/compare` — paid **compareMeToMe** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_compare=true` + real before/after image refs. Unauthenticated callers get `401 oauth_required` (not a free anonymous compare). Vision is limited; missing refs return 400 rather than fake analysis.
 - `GET|POST /api/compare/jobs` — public jobs stub (`503`).
 - `GET|POST /api/compare/test` — **authenticated OAuth / owner / operator TEST only** (not an OpenAPI Action). Costs **1 credit**. History-placeholder analysis from Account Learning. Not a substitute for the paid Action.
-- `GET|POST /api/appearance` — Appearance Agent stub (`503` disabled; not LIVE coaching).
-- `GET|POST /api/appearance/plans` — plan create/get stub (`503` disabled).
+- `GET|POST /api/appearance` — paid **appearancePlan** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_appearance=true` + Account Learning and Compare history. Unauthenticated callers get `401 oauth_required`. Missing history returns 400 rather than invented coaching.
+- `GET|POST /api/appearance/plans` — paid **appearanceCheckin** OpenAPI Action on POST (same 1-credit unit). GET lists the caller’s plans (OAuth). Unauthenticated callers get `401`.
 
 ## Social providers (OAuth skeleton)
 
 Planned: Instagram, LinkedIn, TikTok — **user-authorized OAuth only**. No scraping. No live connect until secrets are configured. Details: [`SOCIAL_PROVIDERS.md`](./SOCIAL_PROVIDERS.md).
 
-## Appearance Agent (scaffold — not LIVE)
+## Appearance Agent (PAID)
 
-90-day professional-image plan/check-in schema + disabled API stubs. **Not LIVE paid coaching.** Depends on Account Learning + Compare Me To Me. Details: [`APPEARANCE_AGENT.md`](./APPEARANCE_AGENT.md).
+90-day professional-image plan/check-in Actions. **Paid, not LIVE unlimited coaching.** Recaps Account Learning + Compare history; fails honestly if required history is missing. Details: [`APPEARANCE_AGENT.md`](./APPEARANCE_AGENT.md).
 
 ## Required Vercel environment variable
 
