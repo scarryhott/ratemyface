@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-08-13T21:10:00Z",
+  "updated_at": "2026-08-13T21:16:35Z",
   "vital_stats": [
     {
       "label": "Available or ready",
-      "value": 12,
-      "note": "2 live · 2 paid · 8 ready"
+      "value": 13,
+      "note": "3 live · 2 paid · 8 ready"
     },
     {
       "label": "Account users",
@@ -77,10 +77,10 @@
     },
     {
       "name": "Social OAuth",
-      "status": "NOT CONFIGURED",
-      "tone": "blocked",
-      "summary": "User-authorized provider connection skeleton is present; scraping stays disabled and no provider is connected.",
-      "stats": ["0 connected", "TikTok · Instagram · LinkedIn"]
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "User-authorized TikTok OAuth is configured; no account is connected yet, Instagram and LinkedIn remain unconfigured, and scraping stays disabled.",
+      "stats": ["TikTok configured", "0 connected", "No scraping"]
     },
     {
       "name": "Ask My History",
@@ -166,7 +166,7 @@
     "premium_subscription": "not configured; STRIPE_PRICE_ID_PREMIUM is absent and premium subscription must not be advertised",
     "security": "RLS is now enabled on all listed public Rate My Face tables. Supabase security advisor still reports several server/ops tables with RLS enabled but no policies, and leaked-password protection is disabled; these are follow-up hardening items rather than the previous broad RLS-disabled exposure",
     "signup_credit_policy": "PR #16 is merged. Default first-account bootstrap is 100 credits unless RMF_SIGNUP_CREDITS=0; credits use the same durable ledger as purchased credits and do not count as lifetime_purchased",
-    "social_provider_connections": "OAuth skeleton remains not configured/live; Instagram/LinkedIn/TikTok connect stubs are OAuth-only and scraping remains disabled",
+    "social_provider_connections": "TikTok user-authorized OAuth is configured; Instagram and LinkedIn remain not configured; 0 accounts connected; scraping remains disabled",
     "appearance_agent": "paid appearancePlan / appearanceCheckin Actions (OAuth + 1 credit); not LIVE unlimited coaching; unauthenticated is 401",
     "compare_me_to_me": "paid compareMeToMe Action (OAuth + 1 credit); unauthenticated is 401; jobs listing stays 503",
     "personal_experiments": "paid getPersonalExperiments / updatePersonalExperiment Actions (OAuth + 1 credit); explicit insufficient/tied/directional evidence closure"

@@ -30,16 +30,16 @@ describe("public feature dashboard", () => {
   it("keeps implementation states distinct from planned and unconfigured states", () => {
     const names = new Set(dashboard.features.map((feature) => feature.name));
     assert.equal(names.size, dashboard.features.length);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "LIVE").length, 2);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "LIVE").length, 3);
     assert.equal(dashboard.features.filter((feature) => feature.status === "PAID").length, 2);
     assert.equal(dashboard.features.filter((feature) => feature.status === "READY").length, 8);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "NOT CONFIGURED").length, 1);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "NOT CONFIGURED").length, 0);
     assert.equal(dashboard.features.filter((feature) => feature.status === "PLANNED").length, 0);
   });
 
   it("uses verified database snapshot values for vital stats", () => {
     const stats = Object.fromEntries(dashboard.vital_stats.map((stat) => [stat.label, stat.value]));
-    assert.equal(stats["Available or ready"], 12);
+    assert.equal(stats["Available or ready"], 13);
     assert.equal(stats["Account users"], 1);
     assert.equal(stats["Saved history"], 4);
     assert.equal(stats["Credit balance"], 92);
@@ -66,5 +66,12 @@ describe("public feature dashboard", () => {
     ]) {
       assert.equal(dashboard.features.find((feature) => feature.name === name)?.status, "READY");
     }
+  });
+
+  it("reflects the live TikTok OAuth connector without claiming a connected account", () => {
+    const social = dashboard.features.find((feature) => feature.name === "Social OAuth");
+    assert.equal(social?.status, "LIVE");
+    assert.ok(social?.stats.includes("TikTok configured"));
+    assert.ok(social?.stats.includes("0 connected"));
   });
 });
