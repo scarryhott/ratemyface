@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.6",
+      version: "2.6.0",
       description:
-        "FREE product links + credit-metered account learning, Compare Me To Me, and Appearance. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
+        "FREE product links + credit-metered account learning, Compare Me To Me, Appearance, and Personal Experiments. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
             {
               name: "mode",
               in: "query",
-              schema: { type: "string", enum: ["profile", "history", "saved", "connections", "report"], default: "profile" }
+              schema: { type: "string", enum: ["profile", "history", "saved", "connections", "what_works", "report"], default: "profile" }
             },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
           ],
@@ -192,6 +192,52 @@ export async function GET(request: NextRequest) {
             "200": { description: "Persisted check-in recap from stored history" },
             "400": { description: "Missing consent_appearance, plan, or required history" },
             "401": { description: "OAuth required — not a free anonymous appearance product" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        }
+      },
+      "/api/experiments": {
+        get: {
+          operationId: "getPersonalExperiments",
+          summary: "PAID/METERED — read my Personal Experiments (1 credit)",
+          description:
+            "Read my A/B experiments and current evidence closure: insufficient, tied, favors_a, or favors_b. Directional results are provisional personal evidence, never causal or medical claims. Costs 1 credit. On 402 MUST call createCreditCheckoutSession same turn.",
+          parameters: [
+            {
+              name: "experiment_id",
+              in: "query",
+              schema: { type: "integer", minimum: 1 },
+              description: "Optional single experiment id. Omit to list recent experiments."
+            },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
+          ],
+          responses: {
+            "200": { description: "Experiment(s), outcomes, and explicit evidence state" },
+            "401": { description: "OAuth required" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        },
+        post: {
+          operationId: "updatePersonalExperiment",
+          summary: "PAID/METERED — define, record, or complete a Personal Experiment (1 credit)",
+          description:
+            "With consent, create a two-option experiment, record a 1-5 outcome for a or b, or complete it. Recalculates evidence without turning insufficient or tied evidence into a conclusion. Costs 1 credit. On 402 MUST call createCreditCheckoutSession same turn.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalExperimentRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted experiment with recalculated evidence closure" },
+            "400": { description: "Invalid operation, consent, definition, option, score, or timestamp" },
+            "401": { description: "OAuth required" },
+            "404": { description: "Experiment not found for this user" },
+            "409": { description: "Experiment is no longer active" },
             "402": {
               description: "Credits required",
               content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
@@ -326,6 +372,42 @@ export async function GET(request: NextRequest) {
               maxLength: 2000,
               description: "After image HTTPS URL or stored ref. Required unless already on the user's profile."
             }
+          }
+        },
+        PersonalExperimentRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["operation", "consent_experiment"],
+          properties: {
+            operation: {
+              type: "string",
+              enum: ["create", "record_outcome", "complete"],
+              description:
+                "create requires title and both option labels; record_outcome requires experiment_id, option_key, and score; complete requires experiment_id."
+            },
+            consent_experiment: {
+              type: "boolean",
+              const: true,
+              description: "Explicit consent to persist this personal experiment or outcome."
+            },
+            title: { type: "string", maxLength: 200 },
+            option_a_label: { type: "string", maxLength: 120 },
+            option_b_label: { type: "string", maxLength: 120 },
+            metric_label: {
+              type: "string",
+              maxLength: 120,
+              description: "What the 1-5 score means, such as confidence or skin comfort."
+            },
+            experiment_id: { type: "integer", minimum: 1 },
+            option_key: { type: "string", enum: ["a", "b"] },
+            score: {
+              type: "integer",
+              minimum: 1,
+              maximum: 5,
+              description: "The user's recorded outcome; higher means better on metric_label."
+            },
+            note: { type: "string", maxLength: 500 },
+            observed_at: { type: "string", format: "date-time" }
           }
         },
         CreditsRequiredResponse: {

@@ -1,5 +1,5 @@
 /**
- * Conversion contracts: same-turn credit checkout, OpenAPI 2.5.6, conversation starters.
+ * Conversion contracts: same-turn credit checkout, OpenAPI 2.6.0, conversation starters.
  * Run: node --experimental-strip-types --test lib/gptConversion.test.ts
  */
 import assert from "node:assert/strict";
@@ -73,13 +73,14 @@ describe("conversation starters in paste lists", () => {
   });
 });
 
-describe("OpenAPI 2.5.6 conversion descriptions", () => {
+describe("OpenAPI 2.6.0 conversion descriptions", () => {
   const openapi = read("app/api/openapi/route.ts");
   const health = read("app/api/health/route.ts");
 
-  it("bumps schema version to 2.5.6", () => {
-    assert.match(openapi, /version:\s*"2\.5\.6"/);
-    assert.match(health, /openapi_version:\s*"2\.5\.6"/);
+  it("bumps schema version to 2.6.0", () => {
+    assert.match(openapi, /version:\s*"2\.6\.0"/);
+    assert.match(health, /openapi_version:\s*"2\.6\.0"/);
+    assert.equal(openapi.includes("2.5.6"), false);
     assert.equal(openapi.includes("2.5.5"), false);
   });
 
@@ -132,6 +133,18 @@ describe("OpenAPI 2.5.6 conversion descriptions", () => {
     assert.match(checkin, /createCreditCheckoutSession/);
     assert.equal(openapi.includes("GPT_INSTRUCTIONS"), false);
   });
+
+  it("adds Personal Experiments with concise honest evidence descriptions", () => {
+    const readExperiments = operationDescription(openapi, "getPersonalExperiments");
+    const writeExperiment = operationDescription(openapi, "updatePersonalExperiment");
+    assert.ok(readExperiments.length <= 300, `getPersonalExperiments desc is ${readExperiments.length}`);
+    assert.ok(writeExperiment.length <= 300, `updatePersonalExperiment desc is ${writeExperiment.length}`);
+    assert.match(readExperiments, /insufficient/);
+    assert.match(readExperiments, /tied/);
+    assert.match(readExperiments, /never causal or medical claims/);
+    assert.match(writeExperiment, /1-5 outcome/);
+    assert.match(writeExperiment, /createCreditCheckoutSession/);
+  });
 });
 
 describe("entitlementsCheckoutFields", () => {
@@ -159,6 +172,7 @@ describe("entitlementsCheckoutFields", () => {
     assert.match(route, /from \"\.\.\/\.\.\/\.\.\/\.\.\/lib\/entitlementsCheckout\"/);
     assert.match(route, /compare_me_to_me:\s*PERSONAL_ACTION_COST/);
     assert.match(route, /appearance_agent:\s*PERSONAL_ACTION_COST/);
+    assert.match(route, /personal_experiments:\s*PERSONAL_EXPERIMENT_ACTION_COST/);
     assert.equal(route.includes("COMPARE_ACTION_COST"), false);
     const helper = read("lib/entitlementsCheckout.ts");
     assert.match(helper, /checkout_action: \"createCreditCheckoutSession\"/);

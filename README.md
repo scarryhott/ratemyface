@@ -26,6 +26,7 @@ The backend never invents ASINs.
 - `GET|POST /api/compare/test` — **authenticated OAuth / owner / operator TEST only** (not an OpenAPI Action). Costs **1 credit**. History-placeholder analysis from Account Learning. Not a substitute for the paid Action.
 - `GET|POST /api/appearance` — paid **appearancePlan** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_appearance=true` + Account Learning and Compare history. Unauthenticated callers get `401 oauth_required`. Missing history returns 400 rather than invented coaching.
 - `GET|POST /api/appearance/plans` — paid **appearanceCheckin** OpenAPI Action on POST (same 1-credit unit). GET lists the caller’s plans (OAuth). Unauthenticated callers get `401`.
+- `GET|POST /api/experiments` — paid **getPersonalExperiments** / **updatePersonalExperiment** Actions. A user defines two distinct options (for example, short beard vs clean-shaven), records 1–5 outcomes for either option, and receives an explicit `insufficient`, `tied`, `favors_a`, or `favors_b` evidence state. Directional results are provisional personal evidence, not causal or medical claims.
 
 ## Social providers (user-authorized OAuth)
 

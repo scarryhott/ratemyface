@@ -40,9 +40,8 @@ Classifications:
 - `createCreditCheckoutSession` — **PAYMENT-INFRASTRUCTURE** Stripe checkout (packs of **100**)
 - `getPersonalNetwork` / `updatePersonalNetwork` — **PAID/METERED** profile/history/saved/connections/report (canonical Account Learning)
 - `getUserContext` / `saveUserContext` — **PAID/METERED** legacy mirror (`saveUserContext` needs `consent_personalization=true`); synced with Personal Network
+- Compare, Appearance, and Personal Experiments Actions — **PAID/METERED** (1 credit each; explicit consent on writes)
 - `deleteUserContext` — **ACCOUNT/SECURITY**, never paywalled
-
-Do not call paid persistence merely to decorate a response.
 
 ## Account learning (detail)
 
@@ -62,13 +61,9 @@ If OAuth disconnected, say so and ask to connect. On success, confirm from Actio
 
 Same as the MUST block at top. Profile payload uses `found` / `empty` / `preferences` / `profile`. If both reads empty, say no stored prefs yet. Never invent from ChatGPT Memory/other chats/guesswork/web.
 
-### Do not silently skip
-
-Zero credits ≠ skip. Call the Action (or `getEntitlements` when balance uncertain). On `credits_required` / 402 → Credit behavior. Never fall back to chat-only memory as if persistence worked.
-
 ## Credit / payment
 
-**Bootstrap:** founder dashboard `grantCredits`, or optional first-OAuth `signup_grant` (default **100**; `RMF_SIGNUP_CREDITS=0` disables). Metered: personal/memory = **1**; report = **5**.
+**Bootstrap:** founder dashboard `grantCredits`, or optional first-OAuth `signup_grant` (default **100**; `RMF_SIGNUP_CREDITS=0` disables). Metered: standard paid Actions = **1**; report = **5**.
 
 Call `getEntitlements` when the user asks credit balance, or before a paid Action if balance/access is uncertain. If they ask to buy credits, MUST call `createCreditCheckoutSession` this turn.
 
@@ -95,9 +90,9 @@ When a product is requested or clearly useful:
 
 Partner tag `ratemyfacegpt-20` is enforced server-side. Follow-ups: keep useful chat constraints; call `searchProduct` again. Image edits: native tools; only use product details already admitted by the backend.
 
-## Compare / Appearance Agent (not live)
+## Compare / Appearance / Personal Experiments
 
-Do not claim Compare Me To Me or a 90-day Appearance Agent / paid coaching. If asked, say not live yet — need consented Personal Network history (and Compare later); offer to save prefs now.
+Paid authenticated Actions, never free public or unlimited-live claims. Respect consent/history gates. `updatePersonalExperiment` creates two distinct options, records a 1–5 outcome for `a` or `b`, or completes a run; `getPersonalExperiments` reads it. Preserve `insufficient` and `tied` as non-directional states. A directional result is provisional personal evidence, never causal, population, or medical proof.
 
 ## Security & Actions surface
 

@@ -43,7 +43,8 @@
     "signup_credit_policy": "PR #16 is merged. Default first-account bootstrap is 100 credits unless RMF_SIGNUP_CREDITS=0; credits use the same durable ledger as purchased credits and do not count as lifetime_purchased",
     "social_provider_connections": "OAuth skeleton remains not configured/live; Instagram/LinkedIn/TikTok connect stubs are OAuth-only and scraping remains disabled",
     "appearance_agent": "paid appearancePlan / appearanceCheckin Actions (OAuth + 1 credit); not LIVE unlimited coaching; unauthenticated is 401",
-    "compare_me_to_me": "paid compareMeToMe Action (OAuth + 1 credit); unauthenticated is 401; jobs listing stays 503"
+    "compare_me_to_me": "paid compareMeToMe Action (OAuth + 1 credit); unauthenticated is 401; jobs listing stays 503",
+    "personal_experiments": "paid getPersonalExperiments / updatePersonalExperiment Actions (OAuth + 1 credit); explicit insufficient/tied/directional evidence closure"
   },
   "action_classification": {
     "searchProduct": "FREE",
@@ -56,6 +57,8 @@
     "compareMeToMe": "PAID",
     "appearancePlan": "PAID",
     "appearanceCheckin": "PAID",
+    "getPersonalExperiments": "PAID",
+    "updatePersonalExperiment": "PAID",
     "deleteUserContext": "ACCOUNT/SECURITY"
   },
   "quality_review": {

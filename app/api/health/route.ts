@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { APPEARANCE_ACTION_COST, APPEARANCE_AGENT } from "../../../lib/appearanceAgent";
 import { COMPARE_ACTION_COST, COMPARE_ME_TO_ME, COMPARE_TEST_ACTION_COST } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
+import {
+  PERSONAL_EXPERIMENT_ACTION_COST,
+  PERSONAL_EXPERIMENTS
+} from "../../../lib/personalExperimentEvidence";
 import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
 import {
   stripeCreditsPriceConfigured,
@@ -32,7 +36,8 @@ export async function GET() {
       metered_memory_cost: 1,
       compare_authenticated_test_cost: COMPARE_TEST_ACTION_COST,
       compare_me_to_me_cost: COMPARE_ACTION_COST,
-      appearance_agent_cost: APPEARANCE_ACTION_COST
+      appearance_agent_cost: APPEARANCE_ACTION_COST,
+      personal_experiment_cost: PERSONAL_EXPERIMENT_ACTION_COST
     },
     compare_me_to_me: {
       // Paid OpenAPI Action. Unauthenticated compare is not free. Not a LIVE vision claim.
@@ -57,6 +62,18 @@ export async function GET() {
       checkin_path: APPEARANCE_AGENT.checkin_path,
       public_unauthenticated: "401 oauth_required"
     },
+    personal_experiments: {
+      // Paid evidence Actions. A closed run may still be insufficient or tied.
+      enabled: PERSONAL_EXPERIMENTS.enabled,
+      status: PERSONAL_EXPERIMENTS.status,
+      note: PERSONAL_EXPERIMENTS.note,
+      tables: [...PERSONAL_EXPERIMENTS.tables],
+      action_path: PERSONAL_EXPERIMENTS.action_path,
+      evidence_states: ["insufficient", "tied", "favors_a", "favors_b"],
+      causal_claim: false,
+      medical_claim: false,
+      public_unauthenticated: "401 oauth_required"
+    },
     social_providers: {
       // enabled only when at least one provider's secrets exist. Never scrape.
       enabled: SOCIAL_PROVIDER_OAUTH.enabled,
@@ -69,14 +86,15 @@ export async function GET() {
       table: SOCIAL_PROVIDER_OAUTH.table
     },
     account_learning: {
-      openapi_version: "2.5.6",
+      openapi_version: "2.6.0",
       profile_empty_shape: "found=false + preferences={}",
       retrieve_action: "getPersonalNetwork",
       pipeline: "rmf_interactions → rmf_personal_recommendations",
       compare_test_link: "opt-in RMF_COMPARE_TEST_LINK=1 queued linker only; not anonymous compare",
       compare_authenticated_test: "POST /api/compare/test (OAuth/operator, 1 credit); internal history placeholder",
       compare_action: "POST /api/compare compareMeToMe (OAuth + 1 credit + consent_compare + image refs)",
-      appearance_action: "POST /api/appearance appearancePlan + POST /api/appearance/plans appearanceCheckin (OAuth + 1 credit + consent_appearance + required history)"
+      appearance_action: "POST /api/appearance appearancePlan + POST /api/appearance/plans appearanceCheckin (OAuth + 1 credit + consent_appearance + required history)",
+      personal_experiment_actions: "GET /api/experiments getPersonalExperiments + POST /api/experiments updatePersonalExperiment (OAuth + 1 credit + consent_experiment for writes)"
     },
     partner_tag: "ratemyfacegpt-20"
   });
