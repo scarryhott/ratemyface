@@ -16,14 +16,15 @@ function asNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function tableExists(tx: any, name: string): Promise<boolean> {
+export async function existingPublicTables(tx: any, names: readonly string[]): Promise<Set<string>> {
+  if (!names.length) return new Set();
   const rows = await tx`
-    select 1
+    select table_name
     from information_schema.tables
-    where table_schema = 'public' and table_name = ${name}
-    limit 1
+    where table_schema = 'public'
+      and table_name in ${tx(names as string[])}
   `;
-  return rows.length > 0;
+  return new Set(rows.map((r: any) => String(r.table_name)));
 }
 
 async function readBillingOverview(tx: any) {
@@ -69,12 +70,20 @@ async function readBillingOverview(tx: any) {
       "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory/compare/appearance unit=1, report=5); founder grantCredits on /operator/dashboard; optional signup_grant (RMF_SIGNUP_CREDITS, default 100); packs via createCreditCheckoutSession → webhook → same rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
   };
 
-  const hasCredits = await tableExists(tx, "rmf_credit_accounts");
-  const hasLedger = await tableExists(tx, "rmf_credit_ledger");
-  const hasEntitlements = await tableExists(tx, "rmf_entitlements");
-  const hasBilling = await tableExists(tx, "rmf_billing_accounts");
-  const hasProfiles = await tableExists(tx, "rmf_personal_profiles");
-  const hasMemory = await tableExists(tx, "rmf_user_context");
+  const existing = await existingPublicTables(tx, [
+    "rmf_credit_accounts",
+    "rmf_credit_ledger",
+    "rmf_entitlements",
+    "rmf_billing_accounts",
+    "rmf_personal_profiles",
+    "rmf_user_context"
+  ]);
+  const hasCredits = existing.has("rmf_credit_accounts");
+  const hasLedger = existing.has("rmf_credit_ledger");
+  const hasEntitlements = existing.has("rmf_entitlements");
+  const hasBilling = existing.has("rmf_billing_accounts");
+  const hasProfiles = existing.has("rmf_personal_profiles");
+  const hasMemory = existing.has("rmf_user_context");
 
   if (!hasCredits && !hasLedger && !hasEntitlements) {
     return {

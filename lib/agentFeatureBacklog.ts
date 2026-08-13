@@ -26,6 +26,7 @@ export type BacklogBlockedOn =
   | "missing_secret"
   | "tests"
   | "production_unreachable"
+  | "github_deferred"
   | null;
 
 export type BacklogLoopStatus =
@@ -582,6 +583,9 @@ export function classifyCycle(input: {
   const { decision } = input;
   if (decision.action === "idle") {
     return { outcome: "idle_no_unfinished", feature_progress: false, blocked_on: null };
+  }
+  if (input.closureState === "github_deferred") {
+    return { outcome: "blocked", feature_progress: false, blocked_on: "github_deferred" };
   }
   if (decision.action === "blocked" || input.closureState === "awaiting_approval") {
     return {

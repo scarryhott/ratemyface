@@ -18,7 +18,6 @@ import {
 import {
   appendFeatureReceipt,
   readFeatureReceipts,
-  realizeFeatureBacklogConsole,
   receiptFromTool,
   recordStrategyFromRun,
   type BusinessMetricsSnapshot
@@ -29,11 +28,19 @@ import {
   type OperatorModelPlan
 } from "./operatorClosure";
 import {
+  workerBlockedResult,
+  workerCompletedResult,
+  workerIdleResult,
+  WORKER_HARNESS
+} from "./operatorWorkerResult";
+import { isGithubToolTimeoutError } from "./operatorGithubTimeout";
+import {
   executeOperatorTool,
   getOperatorToolRegistry,
   githubRead,
   projectContextRead,
   type Authority,
+  type OperatorToolName,
   type OperatorToolReceipt
 } from "./operatorTools";
 
@@ -450,6 +457,13 @@ function fallbackAnalysisPlan(reason: string): OperatorModelPlan {
   });
 }
 
+export { workerBlockedResult, workerCompletedResult, workerIdleResult, WORKER_HARNESS } from "./operatorWorkerResult";
+
+const WORKER_HOT_PATH_TOOLS = new Set<OperatorToolName>([
+  "feature_production_verify",
+  "github_implementation_dispatch"
+]);
+
 export async function gatewayPlan(input: unknown) {
   const key = process.env.AI_GATEWAY_API_KEY;
   if (!key) throw new Error("AI_GATEWAY_API_KEY_not_configured");
@@ -507,7 +521,7 @@ export async function gatewayPlan(input: unknown) {
 
 export async function runOneSignal() {
   const signal = await nextSignal();
-  if (!signal) return { ok: true, idle: true, harness: "closure-native-v1" };
+  if (!signal) return workerIdleResult();
 
   const sql = db();
   const requested = clampAuthority(signal.requested_authority, 1);
@@ -515,7 +529,7 @@ export async function runOneSignal() {
   const admittedAuthority = Math.min(requested, maxAuthority) as Authority;
   const runs = await sql`
     insert into rmf_agent_runs(signal_id,authority,status,harness,closure_state)
-    values(${signal.id},${admittedAuthority},'running','closure-native-v1','context')
+    values(${signal.id},${admittedAuthority},'running',${WORKER_HARNESS},'context')
     returning id
   `;
   const runId = Number(runs[0].id);
@@ -545,11 +559,6 @@ export async function runOneSignal() {
       reason: managerial.reason
     };
     signal.payload = payload;
-    try {
-      await realizeFeatureBacklogConsole();
-    } catch {
-      /* console persist is best-effort */
-    }
   }
 
   async function persistStrategy(
@@ -574,6 +583,35 @@ export async function runOneSignal() {
     }
   }
 
+  async function finishGithubDeferred(
+    plan: OperatorModelPlan,
+    closure: ReturnType<typeof resolveClosure> | null,
+    reason: string
+  ) {
+    const cycle = managerial
+      ? classifyCycle({ decision: managerial, executedTool: null, closureState: "github_deferred" })
+      : { outcome: "blocked" as const, feature_progress: false, blocked_on: "github_deferred" as const };
+    await sql`
+      update rmf_agent_runs
+      set status='blocked',closure_state='github_deferred',
+          result=${sql.json({ executed: false, closure, cycle, feature_progress: false, reason } as any)},
+          completed_at=now()
+      where id=${runId}
+    `;
+    await sql`update rmf_agent_signals set status='completed',completed_at=now() where id=${signalId}`;
+    await ledger(runId, "github_deferred", admittedAuthority, { reason, cycle, feature_progress: false }, "github_implementation_dispatch", false);
+    const strategy_report = await persistStrategy("blocked", plan, "github_deferred");
+    return workerBlockedResult({
+      run_id: runId,
+      blocked_on: "github_deferred",
+      plan,
+      closure,
+      cycle,
+      strategy_report,
+      reason
+    });
+  }
+
   try {
     await ledger(runId, "signal_admitted", admittedAuthority, {
       signal_id: signal.id,
@@ -584,13 +622,17 @@ export async function runOneSignal() {
       admitted_authority: admittedAuthority
     });
 
-    const context = await operatorContext();
-    const contextDigest = digest(context);
+    const contextDigest = digest({
+      harness: WORKER_HARNESS,
+      kind,
+      admitted_authority: admittedAuthority,
+      managerial: payload.managerial_action || null
+    });
     await sql`update rmf_agent_runs set context_digest=${contextDigest},closure_state='plan' where id=${runId}`;
     await ledger(runId, "context_realized", admittedAuthority, {
       context_digest: contextDigest,
-      github: context.github,
-      runtime: context.runtime
+      hot_path: true,
+      skipped: ["github_context", "ai_gateway", "schema_ddl"]
     }, "project_context_read");
 
     let ai: { model: string; plan: OperatorModelPlan; usage: any };
@@ -604,29 +646,14 @@ export async function runOneSignal() {
         feature_progress: false
       }, "feature_backlog", managerial.action !== "blocked" && managerial.action !== "idle");
     } else {
-      try {
-        ai = await gatewayPlan({
-          signal: {
-            id: signal.id,
-            source: signal.source,
-            kind: signal.kind,
-            payload: signal.payload
-          },
-          admitted_authority: admittedAuthority,
-          project: context
-        });
-      } catch (error) {
-        const reason = errorMessage(error);
-        if (String(signal.kind) === "control_probe") {
-          ai = { model: "deterministic-closure-taskset", plan: fallbackProbePlan(), usage: null };
-        } else {
-          ai = { model: "safe-planner-fallback", plan: fallbackAnalysisPlan(reason), usage: null };
-        }
-        await ledger(runId, "planner_fallback", admittedAuthority, {
-          reason,
-          fallback: String(signal.kind) === "control_probe" ? "deterministic_control_probe" : "safe_halt"
-        }, String(signal.kind) === "control_probe" ? "control_probe" : "project_context_read", false);
-      }
+      ai = {
+        model: "worker-hot-path",
+        plan: fallbackAnalysisPlan("worker_hot_path_skips_gateway"),
+        usage: null
+      };
+      await ledger(runId, "planner_skipped", admittedAuthority, {
+        reason: "worker_hot_path_skips_gateway"
+      }, "project_context_read", false);
     }
 
     const closure = resolveClosure(signal, ai.plan, admittedAuthority);
@@ -662,15 +689,17 @@ export async function runOneSignal() {
       const strategy_report = await persistStrategy("awaiting_approval", ai.plan, closure.state);
       return {
         ok: true,
-        run_id: runId,
+        idle: false,
         status: "awaiting_approval",
-        harness: "closure-native-v1",
+        harness: WORKER_HARNESS,
+        run_id: runId,
+        blocked_on: cycle?.blocked_on || "approval",
+        feature_progress: false,
         plan: ai.plan,
         closure,
         cycle,
-        feature_progress: false,
-        blocked_on: cycle?.blocked_on || "approval",
-        strategy_report
+        strategy_report,
+        reason: closure.reason
       };
     }
 
@@ -683,10 +712,11 @@ export async function runOneSignal() {
           })
         : null;
       const honestIdle = managerial?.action === "idle";
-      const status = cycle?.outcome === "noop_failed" ? "failed" : honestIdle ? "completed" : "halted";
+      const blocked = cycle?.outcome === "blocked";
+      const status = cycle?.outcome === "noop_failed" ? "failed" : honestIdle ? "completed" : blocked ? "blocked" : "halted";
       const closureState = honestIdle
         ? "idle_no_unfinished"
-        : cycle?.outcome === "blocked"
+        : blocked
           ? "blocked"
           : cycle?.outcome === "noop_failed"
             ? "noop_failed"
@@ -704,11 +734,32 @@ export async function runOneSignal() {
         feature_progress: false
       }, undefined, honestIdle);
       const strategy_report = await persistStrategy(status, ai.plan, closureState);
+      if (honestIdle) {
+        return workerCompletedResult({
+          run_id: runId,
+          plan: ai.plan,
+          closure,
+          cycle,
+          strategy_report
+        });
+      }
+      if (blocked) {
+        return workerBlockedResult({
+          run_id: runId,
+          blocked_on: cycle?.blocked_on || managerial?.blocked_on || "unknown",
+          plan: ai.plan,
+          closure,
+          cycle,
+          strategy_report,
+          reason: managerial?.reason || closure.reason
+        });
+      }
       return {
-        ok: honestIdle || cycle?.outcome === "blocked",
+        ok: false,
+        idle: false,
         run_id: runId,
         status,
-        harness: "closure-native-v1",
+        harness: WORKER_HARNESS,
         plan: ai.plan,
         closure,
         cycle,
@@ -718,21 +769,34 @@ export async function runOneSignal() {
       };
     }
 
+    const selectedTool = closure.selected.tool;
+    const githubTool =
+      selectedTool === "github_implementation_dispatch" ||
+      selectedTool === "github_branch_diagnostic" ||
+      selectedTool === "github_read";
+    if (githubTool && !WORKER_HOT_PATH_TOOLS.has(selectedTool)) {
+      return finishGithubDeferred(ai.plan, closure, `worker_skips_unbounded_${selectedTool}`);
+    }
+
     await sql`update rmf_agent_runs set closure_state='execute' where id=${runId}`;
     await ledger(runId, "tool_execution_started", admittedAuthority, {
-      tool: closure.selected.tool,
+      tool: selectedTool,
       candidate: closure.selected
-    }, closure.selected.tool);
+    }, selectedTool);
 
-    const receipt = await executeOperatorTool(
-      closure.selected.tool,
-      closure.selected.args,
-      {
+    let receipt: OperatorToolReceipt;
+    try {
+      receipt = await executeOperatorTool(selectedTool, closure.selected.args, {
         runId,
         signalId: Number(signal.id),
         admittedAuthority
+      });
+    } catch (error) {
+      if (githubTool && (isGithubToolTimeoutError(error) || /github_timeout/i.test(errorMessage(error)))) {
+        return finishGithubDeferred(ai.plan, closure, errorMessage(error));
       }
-    );
+      throw error;
+    }
     const receiptRow = await storeReceipt(runId, receipt);
     await ledger(runId, "independent_return", admittedAuthority, {
       receipt_id: receiptRow.id,
@@ -771,7 +835,6 @@ export async function runOneSignal() {
             }
           })
         );
-        await realizeFeatureBacklogConsole();
       } catch {
         /* receipt persist is best-effort after the tool already ran */
       }
@@ -800,11 +863,24 @@ export async function runOneSignal() {
     }, receipt.tool, receipt.verified && !noopFailed);
 
     const strategy_report = await persistStrategy(finalStatus, ai.plan, closureState);
+    if (finalStatus === "completed") {
+      return workerCompletedResult({
+        run_id: runId,
+        receipt,
+        plan: ai.plan,
+        closure,
+        cycle,
+        strategy_report,
+        blocked_on: cycle?.blocked_on || null,
+        feature_progress: cycle?.feature_progress === true
+      });
+    }
     return {
       ok: receipt.verified && !noopFailed,
+      idle: false,
       run_id: runId,
       status: finalStatus,
-      harness: "closure-native-v1",
+      harness: WORKER_HARNESS,
       plan: ai.plan,
       closure,
       receipt,
@@ -814,6 +890,9 @@ export async function runOneSignal() {
       strategy_report
     };
   } catch (error) {
+    if (isGithubToolTimeoutError(error) || /github_timeout/i.test(errorMessage(error))) {
+      return finishGithubDeferred(fallbackAnalysisPlan(errorMessage(error)), null, errorMessage(error));
+    }
     const message = errorMessage(error);
     await sql`
       update rmf_agent_runs
