@@ -18,3 +18,199 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 .opsTable { width: 100%; border-collapse: collapse; font-size: 14px; }
 .opsTable th, .opsTable td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
 .opsTable th { color: #555; font-weight: 600; }
+
+.featureDashboard {
+  max-width: 1180px;
+  padding-top: 42px;
+  padding-bottom: 96px;
+}
+.featureDashboardBack {
+  display: inline-block;
+  margin-bottom: 28px;
+  color: #475467;
+  font-weight: 700;
+  text-decoration: none;
+}
+.featureDashboardBack:hover { color: #101828; }
+.featureDashboardHero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 34px;
+  border: 1px solid #d0d5dd;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(47, 129, 247, 0.12), transparent 34%),
+    linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 18px 55px rgba(16, 24, 40, 0.07);
+}
+.featureDashboardHero h1 {
+  margin: 4px 0 10px;
+  font-size: clamp(38px, 7vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+.featureDashboardEyebrow {
+  margin: 0;
+  color: #175cd3;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.featureDashboardIntro {
+  max-width: 690px;
+  margin: 0;
+  color: #475467;
+  font-size: 18px;
+}
+.featureClosureBadge {
+  min-width: 150px;
+  padding: 18px 20px;
+  border: 1px solid #b2ccff;
+  border-radius: 18px;
+  background: #eff8ff;
+  color: #1849a9;
+  text-align: right;
+}
+.featureClosureBadge strong {
+  display: block;
+  font-size: 34px;
+  line-height: 1;
+}
+.featureClosureBadge span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.featureSectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 64px 0 18px;
+}
+.featureSectionHeading h2 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+.featureSectionHeading > p {
+  max-width: 480px;
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  text-align: right;
+}
+.vitalStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.vitalStatCard {
+  min-height: 164px;
+  padding: 20px;
+  border: 1px solid #e4e7ec;
+  border-radius: 18px;
+  background: #fff;
+}
+.vitalStatCard > span {
+  color: #667085;
+  font-size: 13px;
+  font-weight: 700;
+}
+.vitalStatCard > strong {
+  display: block;
+  margin-top: 14px;
+  color: #101828;
+  font-size: 38px;
+  letter-spacing: -0.04em;
+}
+.vitalStatCard > p {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.featureStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.featureStatusCard {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid #e4e7ec;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.04);
+}
+.featureStatusGrid--planned .featureStatusCard {
+  min-height: 190px;
+  background: #fcfcfd;
+  box-shadow: none;
+}
+.featureStatusHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.featureStatusHeader h3 {
+  margin: 0;
+  color: #101828;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.featureStatusCard > p {
+  margin: 18px 0 24px;
+  color: #475467;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.featureBadge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+.featureBadge--live { border-color: #abefc6; background: #ecfdf3; color: #067647; }
+.featureBadge--paid { border-color: #b2ccff; background: #eff8ff; color: #1849a9; }
+.featureBadge--ready { border-color: #d6bbfb; background: #f4f3ff; color: #6938ef; }
+.featureBadge--blocked { border-color: #fedf89; background: #fffaeb; color: #b54708; }
+.featureBadge--planned { border-color: #e4e7ec; background: #f2f4f7; color: #475467; }
+.featureStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.featureStats span {
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #f2f4f7;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .featureDashboard { padding-top: 28px; }
+  .featureDashboardHero { align-items: flex-start; flex-direction: column; padding: 26px; }
+  .featureClosureBadge { min-width: 0; text-align: left; }
+  .featureSectionHeading { align-items: flex-start; flex-direction: column; }
+  .featureSectionHeading > p { text-align: left; }
+  .vitalStatsGrid, .featureStatusGrid { grid-template-columns: 1fr; }
+  .vitalStatCard { min-height: 0; }
+  .featureStatusCard, .featureStatusGrid--planned .featureStatusCard { min-height: 0; }
+}

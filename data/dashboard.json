@@ -1,5 +1,130 @@
 {
-  "updated_at": "2026-08-13T12:31:00Z",
+  "updated_at": "2026-08-13T20:26:05Z",
+  "vital_stats": [
+    {
+      "label": "Available or ready",
+      "value": 6,
+      "note": "2 live · 2 paid · 2 ready"
+    },
+    {
+      "label": "Account users",
+      "value": 1,
+      "note": "1 persistent personal profile"
+    },
+    {
+      "label": "Saved history",
+      "value": 4,
+      "note": "2 interactions · 2 recommendations"
+    },
+    {
+      "label": "Credit balance",
+      "value": 92,
+      "note": "8 lifetime credits spent"
+    },
+    {
+      "label": "Compare results",
+      "value": 1,
+      "note": "1 stored job · vision remains limited"
+    },
+    {
+      "label": "Credits purchased",
+      "value": 0,
+      "note": "Purchase-to-credit closure is not yet demonstrated"
+    }
+  ],
+  "features": [
+    {
+      "name": "Product Search",
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "Free Amazon product discovery with tagged fallback links and no invented product identity, price, or ASIN.",
+      "stats": ["Free action", "Affiliate attribution active"]
+    },
+    {
+      "name": "Account Learning",
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "OAuth-backed personal profiles, interaction history, saved recommendations, and credit-metered persistence.",
+      "stats": ["1 profile", "2 interactions", "2 recommendations"]
+    },
+    {
+      "name": "What Works For Me",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Synthesizes saved preferences and demonstrated outcomes without turning sparse evidence into false confidence.",
+      "stats": ["PR #37", "Evidence confidence states"]
+    },
+    {
+      "name": "Compare Me To Me",
+      "status": "PAID",
+      "tone": "paid",
+      "summary": "Compares a user's own before-and-after evidence and returns an honest limited result when vision cannot run.",
+      "stats": ["1 credit", "1 job", "1 result", "Vision limited"]
+    },
+    {
+      "name": "Appearance Agent",
+      "status": "PAID",
+      "tone": "paid",
+      "summary": "Builds a 90-day appearance plan and check-ins from Account Learning and Compare history.",
+      "stats": ["1 credit", "90-day plan", "History required", "0 plans yet"]
+    },
+    {
+      "name": "Personal Experiments",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Tracks user-defined A/B outcomes with explicit insufficient, tied, favors A, or favors B evidence closure.",
+      "stats": ["PR #38", "2 outcomes per option", "1 credit per write", "0 experiments yet"]
+    },
+    {
+      "name": "Social OAuth",
+      "status": "NOT CONFIGURED",
+      "tone": "blocked",
+      "summary": "User-authorized provider connection skeleton is present; scraping stays disabled and no provider is connected.",
+      "stats": ["0 connected", "TikTok · Instagram · LinkedIn"]
+    },
+    {
+      "name": "Ask My History",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Answer questions directly from the user's own saved interaction and outcome history.",
+      "stats": ["Not built"]
+    },
+    {
+      "name": "Outcome-aware Product Learning",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Learn which recommended products actually worked for the individual instead of relying on stated preference alone.",
+      "stats": ["Not built"]
+    },
+    {
+      "name": "Social Outcome Intelligence",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Relate authorized social evidence to personal outcomes without scraping or unsupported inference.",
+      "stats": ["Not built"]
+    },
+    {
+      "name": "Reference Comparison",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Compare the user's own evidence with a chosen reference while keeping identity and causality claims bounded.",
+      "stats": ["Not built"]
+    },
+    {
+      "name": "Personal Network / MCP Expansion",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Expose more of the personal evidence network through bounded, consented tools.",
+      "stats": ["Not built"]
+    },
+    {
+      "name": "Autonomous Personal Agent",
+      "status": "PLANNED",
+      "tone": "planned",
+      "summary": "Act on personal evidence over time with explicit authority, receipts, and closure checks.",
+      "stats": ["Not built"]
+    }
+  ],
   "summary": {
     "status": "openapi_v2_5_3_live_account_learning_active_bootstrap_credits_consuming_purchase_closure_unverified",
     "goal": "Differentiate Rate My Face from default ChatGPT through authenticated cross-session state, verified affiliate routing, and server-enforced paid persistence while preserving a useful free experience."
