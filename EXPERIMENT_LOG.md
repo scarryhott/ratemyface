@@ -113,3 +113,15 @@ Append one concise entry per material experiment.
 - **Change made:** server-only test endpoint; honest history-placeholder result; follow-up `compare_test` interaction + `context` recommendation; credits metered via `consumeCredits`. Public OpenAPI/GPT unchanged. Amazon/social/appearance flags untouched.
 - **Rollback:** revert this commit; public stubs remain 503; test rows can stay as TESTING artifacts.
 - **Next / monitor:** public 503; authenticated test → job+result+follow-up; health `enabled=false`; dashboard live job counts.
+
+### 2026-08-13 — Signup credit bootstrap vs paid-first activation
+- **Surface:** GPT + OAuth + credit ledger + Personal Network
+- **Hypothesis:** A 100-credit first-account bootstrap will increase successful Account Learning activation versus a paid-first 0-credit path, while preserving later checkout demand after bootstrap credits are consumed.
+- **Variant A:** `RMF_SIGNUP_CREDITS=0` (new authenticated account reaches `credits_required` before first persistent write/read).
+- **Variant B:** current default 100 signup credits through the same durable `rmf_credit_ledger` used by purchased credits.
+- **Metric:** successful `updatePersonalNetwork`/`getPersonalNetwork` activations per new OAuth account; secondary: credits consumed before first Checkout Session, later checkout conversion after balance exhaustion, and 7-day authenticated return.
+- **Evidence/source:** PR #16 is merged; live Supabase now has 1 credit account with 92 credits remaining, 8 lifetime credits spent, 0 lifetime purchased, 1 profile, 2 interactions, 2 personal recommendations, and 1 compare test/result. Stripe still has 0 Checkout Sessions, so current activation is grant/bootstrap-funded rather than purchased.
+- **Result:** early activation signal only, not causal — Variant B has produced real persistent usage, but no randomized Variant A cohort or return-rate telemetry exists yet.
+- **Change made:** no new Action/schema change today; logged the measurable A/B design and current evidence. Existing bootstrap remains reversible with `RMF_SIGNUP_CREDITS=0`.
+- **Rollback:** set `RMF_SIGNUP_CREDITS=0`; no ledger rewrite required.
+- **Next:** add cohort/event telemetry before interpreting conversion, then compare activation and 7-day return across 0-credit vs 100-credit cohorts without changing paid Action classifications.
