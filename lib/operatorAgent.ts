@@ -519,6 +519,8 @@ export async function runOneSignal() {
       : {};
   const metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
   const kind = String(signal.kind);
+  const signalId = Number(signal.id);
+  const signalSource = String(signal.source);
   const isBuildCycle = kind === "business_improve" || kind === "heartbeat";
   let managerial: ManagerialDecision | null = null;
   if (isBuildCycle) {
@@ -551,10 +553,10 @@ export async function runOneSignal() {
   ) {
     try {
       return await recordStrategyFromRun({
-        source: String(signal.source),
-        kind: String(signal.kind),
+        source: signalSource,
+        kind: kind,
         runId,
-        signalId: Number(signal.id),
+        signalId,
         status,
         closureState: closureState || null,
         plan,
