@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { databaseConfigured, db, DB_OPERATION_TIMEOUT_MS, isDatabaseTimeoutError, withDatabaseTimeout } from "../../../../lib/db";
 import {
+  buildFeatureBacklogConsole,
   readStrategyReports,
+  realizeFeatureBacklogConsole,
   snapshotBusinessMetrics
 } from "../../../../lib/agentBusinessLoop";
 import { ensureOperatorSchema } from "../../../../lib/operatorAgent";
@@ -24,7 +26,8 @@ export async function GET(request: NextRequest) {
       database_configured: false,
       metrics: await snapshotBusinessMetrics(),
       strategy: { latest: null, history: [] },
-      queue: { signals_queued: 0, pending_approvals: 0, runs_7d: 0 },
+      queue: { signals_queued: 0, pending_approvals: 0, runs_7d: 0, note: "Ops activity — not feature progress" },
+      backlog: buildFeatureBacklogConsole([]),
       recent_signals: [],
       recent_runs: [],
       pending_approvals: [],
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest) {
     return await withDatabaseTimeout(async () => {
       await ensureOperatorSchema();
       const sql = db();
-      const [queued, approvalsPending, runs7d, signals, runs, approvals, strategy, metrics] =
+      const [queued, approvalsPending, runs7d, signals, runs, approvals, strategy, metrics, backlog] =
         await Promise.all([
           sql`select count(*)::int as total from rmf_agent_signals where status='queued'`,
           sql`select count(*)::int as total from rmf_agent_approvals where status='pending'`,
@@ -68,7 +71,8 @@ export async function GET(request: NextRequest) {
             limit 20
           `,
           readStrategyReports(12),
-          snapshotBusinessMetrics()
+          snapshotBusinessMetrics(),
+          realizeFeatureBacklogConsole()
         ]);
 
       return NextResponse.json({
@@ -79,10 +83,12 @@ export async function GET(request: NextRequest) {
         generated_at: new Date().toISOString(),
         metrics,
         strategy,
+        backlog,
         queue: {
           signals_queued: Number(queued[0]?.total || 0),
           pending_approvals: Number(approvalsPending[0]?.total || 0),
-          runs_7d: Number(runs7d[0]?.total || 0)
+          runs_7d: Number(runs7d[0]?.total || 0),
+          note: "Ops activity — not feature progress"
         },
         recent_signals: signals,
         recent_runs: runs,

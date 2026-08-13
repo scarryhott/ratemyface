@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:account-learning": "node --experimental-strip-types --test lib/accountLearningShape.test.ts lib/accountLearningPipeline.test.ts lib/appearanceAgent.test.ts lib/compareJobs.test.ts lib/compareVision.test.ts lib/db.test.ts lib/gptConversion.test.ts",
+    "test:account-learning": "node --experimental-strip-types --test lib/accountLearningShape.test.ts lib/accountLearningPipeline.test.ts lib/appearanceAgent.test.ts lib/compareJobs.test.ts lib/compareVision.test.ts lib/db.test.ts lib/gptConversion.test.ts lib/agentFeatureBacklog.test.ts",
     "test:rls": "node --experimental-strip-types --test lib/rmfPersonalBillingRls.test.ts lib/rmfCompareRls.test.ts lib/rmfProviderConnectionsRls.test.ts lib/rmfAppearanceAgentRls.test.ts",
     "test": "npm run test:account-learning && npm run test:rls"
   },

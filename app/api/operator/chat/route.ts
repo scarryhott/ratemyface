@@ -103,7 +103,7 @@ export async function PUT(request: NextRequest) {
       commercial_loop: metrics_snapshot.commercial_loop,
       dashboard: "/operator/dashboard#agents"
     },
-    1
+    2
   );
 
   let run: any = null;
@@ -124,6 +124,9 @@ export async function PUT(request: NextRequest) {
     signal,
     run,
     strategy_report: run?.strategy_report || null,
-    note: "Autonomous improve cycle queued/run. Strategy impact is stored for the dashboard Agent Console."
+    cycle: run?.cycle || null,
+    feature_progress: run?.feature_progress === true,
+    blocked_on: run?.blocked_on || null,
+    note: "Build cycle queued/run. Heartbeat/strategy reports are not feature progress. Backlog advances only on a verified production receipt."
   });
 }

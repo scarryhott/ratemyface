@@ -1,3 +1,15 @@
+import {
+  classifyCycle,
+  deriveBacklog,
+  inspectRepoEvidence,
+  loadFeatureBacklogSpec,
+  newFeatureReceipt,
+  selectHighestPriorityUnfinished,
+  type BacklogItemView,
+  type FeatureReceipt,
+  type ManagerialDecision,
+  type ProductionHealthEvidence
+} from "./agentFeatureBacklog";
 import { databaseConfigured, db } from "./db";
 import { ensureOperatorSchema } from "./operatorAgent";
 import { creditsPerPack, signupCredits } from "./stripeBilling";
@@ -61,6 +73,40 @@ function asNumber(value: unknown): number | null {
   if (value == null) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Heartbeat-safe snapshot: code/flag evidence only.
+ * No table scans and no agent-schema DDL.
+ */
+export function snapshotBusinessFlags(): BusinessMetricsSnapshot {
+  return {
+    captured_at: new Date().toISOString(),
+    database_configured: databaseConfigured(),
+    auth_users: null,
+    oauth_users: null,
+    personal_profiles: null,
+    interactions: null,
+    personal_recommendations: null,
+    credit_balance_total: null,
+    lifetime_purchased: null,
+    lifetime_spent: null,
+    stripe_events: null,
+    agent_runs_7d: null,
+    agent_signals_queued: null,
+    pending_approvals: null,
+    compare_enabled: false,
+    appearance_agent_enabled: false,
+    credits_per_pack: creditsPerPack(),
+    signup_credits: signupCredits(),
+    amazon_tag: "ratemyfacegpt-20",
+    commercial_loop:
+      "free GPT acquisition → useful Action → account → persistent value → credits/payment → feedback/retention → experiment → improved Action → measured profit → bounded reinvestment",
+    notes: [
+      "Heartbeat snapshot is flag/code evidence only — table counts are not queried on this path.",
+      "Heartbeat success is not feature progress. Only a verified implementation receipt advances the backlog."
+    ]
+  };
 }
 
 /** Lightweight business snapshot for agent planning + dashboard strategy impact. */
@@ -277,14 +323,134 @@ export async function recordStrategyFromRun(input: {
 
 export function businessImproveGoal(): string {
   return [
-    "Autonomous business improve cycle for Rate My Face.",
-    "Review the full commercial loop and current metrics snapshot.",
-    "Identify the highest-value bottleneck (acquisition, Action usefulness, account learning, credits/payment, retention, or ops).",
-    "Propose one reversible next step at minimum authority.",
-    "Return JSON including business_impact:{bottleneck,hypothesis,recommended_next_step,expected_metric_effect,funnel_stage,confidence}.",
+    "Execution-bearing build cycle for Rate My Face.",
+    "Inspect the Harry-specified backlog (Account Learning, Compare Me To Me, Appearance Agent, Social OAuth).",
+    "Choose the highest-priority unfinished item from repo/production evidence — not another strategy report.",
+    "If unfinished, dispatch the GitHub L2 implementation path (isolated branch, tests, draft PR). Do not merge unless the security envelope admits it.",
+    "If evidence already looks complete, verify production health/flag/endpoint and record a receipt.",
+    "Heartbeat enqueue, persist-heartbeat, and observe-only reports are not done.",
     "Do not invent ChatGPT chat counts, Amazon revenue, or Stripe USD. Label missing sources Unavailable.",
     "Compare Me To Me and Appearance Agent are paid credit-metered Actions (not LIVE unlimited vision/coaching claims). Unauthenticated compare/appearance are not free.",
-    "Prefer Account Learning + credit economy closure over new features.",
-    "Report clearly how the recommended strategy helps the business."
+    "Do not build extras. Product credits stay 1-credit for subscription features. Amazon/affiliate unchanged."
   ].join(" ");
+}
+
+const BACKLOG_STATE_KEY = "feature_backlog:state";
+const BACKLOG_RECEIPTS_KEY = "feature_backlog:receipts";
+
+export type FeatureBacklogConsole = {
+  version: number;
+  loop: "execution-bearing-v1";
+  note: string;
+  current_item: BacklogItemView | null;
+  last_receipt: FeatureReceipt | null;
+  blocked_on: BacklogItemView["blocked_on"];
+  items: BacklogItemView[];
+  feature_progress_from_counts: false;
+};
+
+export async function readFeatureReceipts(): Promise<FeatureReceipt[]> {
+  if (!databaseConfigured()) return [];
+  await ensureOperatorSchema();
+  const sql = db();
+  const rows = await sql`select value from rmf_agent_context where key = ${BACKLOG_RECEIPTS_KEY} limit 1`;
+  return Array.isArray(rows[0]?.value) ? (rows[0].value as FeatureReceipt[]) : [];
+}
+
+export async function appendFeatureReceipt(receipt: FeatureReceipt): Promise<FeatureReceipt> {
+  await ensureOperatorSchema();
+  const sql = db();
+  const existing = await readFeatureReceipts();
+  const next = [receipt, ...existing.filter((r) => r.id !== receipt.id)].slice(0, 80);
+  await sql`
+    insert into rmf_agent_context(key, value, updated_at)
+    values(${BACKLOG_RECEIPTS_KEY}, ${sql.json(next as any)}, now())
+    on conflict(key) do update set value = excluded.value, updated_at = now()
+  `;
+  return receipt;
+}
+
+export async function writeFeatureBacklogState(state: FeatureBacklogConsole): Promise<FeatureBacklogConsole> {
+  await ensureOperatorSchema();
+  const sql = db();
+  await sql`
+    insert into rmf_agent_context(key, value, updated_at)
+    values(${BACKLOG_STATE_KEY}, ${sql.json(state as any)}, now())
+    on conflict(key) do update set value = excluded.value, updated_at = now()
+  `;
+  return state;
+}
+
+export function buildFeatureBacklogConsole(
+  receipts: FeatureReceipt[],
+  production: ProductionHealthEvidence | null = null
+): FeatureBacklogConsole {
+  const evidence = inspectRepoEvidence();
+  const items = deriveBacklog(evidence, receipts, production);
+  const current = selectHighestPriorityUnfinished(items);
+  const last = receipts[0] || current?.last_receipt || null;
+  return {
+    version: loadFeatureBacklogSpec().version,
+    loop: "execution-bearing-v1",
+    note: "Run/signal/heartbeat counts are ops activity, not feature progress. Backlog advances only on a verified production receipt.",
+    current_item: current,
+    last_receipt: last,
+    blocked_on: current?.blocked_on || null,
+    items,
+    feature_progress_from_counts: false
+  };
+}
+
+export async function realizeFeatureBacklogConsole(
+  production: ProductionHealthEvidence | null = null
+): Promise<FeatureBacklogConsole> {
+  const receipts = await readFeatureReceipts();
+  const view = buildFeatureBacklogConsole(receipts, production);
+  try {
+    await writeFeatureBacklogState(view);
+  } catch {
+    // Console read should still succeed if persist fails.
+  }
+  return view;
+}
+
+export function cycleRecordFromDecision(
+  decision: ManagerialDecision,
+  extra: {
+    executedTool?: string | null;
+    closureState?: string | null;
+    receiptVerified?: boolean;
+    heartbeatOnly?: boolean;
+  }
+) {
+  return classifyCycle({
+    decision,
+    executedTool: extra.executedTool as any,
+    closureState: extra.closureState,
+    receiptVerified: extra.receiptVerified,
+    heartbeatOnly: extra.heartbeatOnly
+  });
+}
+
+export function receiptFromTool(input: {
+  itemId: FeatureReceipt["item_id"];
+  kind: FeatureReceipt["kind"];
+  verified: boolean;
+  runId: number | null;
+  signalId: number | null;
+  externalRef: string | null;
+  blockedOn: FeatureReceipt["blocked_on"];
+  detail: Record<string, unknown>;
+}): FeatureReceipt {
+  return newFeatureReceipt({
+    item_id: input.itemId,
+    kind: input.kind,
+    verified: input.verified,
+    advances_backlog: input.kind === "production_verify" && input.verified,
+    run_id: input.runId,
+    signal_id: input.signalId,
+    external_ref: input.externalRef,
+    blocked_on: input.blockedOn,
+    detail: input.detail
+  });
 }

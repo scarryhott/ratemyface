@@ -11,6 +11,7 @@ import {
   APPEARANCE_ACTION_TIMEOUT_MS,
   COMPARE_ACTION_TIMEOUT_MS,
   COMPARE_TEST_DB_TIMEOUT_MS,
+  HEARTBEAT_DB_TIMEOUT_MS,
   DatabaseTimeoutError,
   dbClientGeneration,
   isDatabaseTimeoutError,
@@ -132,6 +133,19 @@ describe("compare POST hang regression (no live DB)", () => {
     assert.equal(status, 504);
     assert.equal(error, "database_timeout");
     assert.ok(Date.now() - started < 400);
+  });
+
+  it("GET /api/operator/heartbeat is enqueue-only and bounded under 10s", () => {
+    const heartbeat = readFileSync(join(ROOT, "app/api/operator/heartbeat/route.ts"), "utf8");
+    assert.match(heartbeat, /withDatabaseTimeout/);
+    assert.match(heartbeat, /HEARTBEAT_DB_TIMEOUT_MS/);
+    assert.match(heartbeat, /enqueueSignalIdempotent/);
+    assert.equal(heartbeat.includes("runOneSignal"), false);
+    assert.equal(heartbeat.includes("ensureOperatorSchema"), false);
+    assert.ok(HEARTBEAT_DB_TIMEOUT_MS <= 8_000);
+    assert.ok(HEARTBEAT_DB_TIMEOUT_MS < 10_000);
+    const dbSource = readFileSync(join(ROOT, "lib/db.ts"), "utf8");
+    assert.match(dbSource, /HEARTBEAT_DB_TIMEOUT_MS/);
   });
 
   it("GET /api/operator/agents uses the same bounded DB wrapper", () => {
