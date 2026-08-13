@@ -246,22 +246,31 @@ describe("current business_improve wins", () => {
 describe("worker / heartbeat wiring", () => {
   it("nextSignal uses the queue planner and does not blindly requeue every stale signal", () => {
     const agent = readFileSync(join(ROOT, "lib/operatorAgent.ts"), "utf8");
-    const next = agent.slice(agent.indexOf("export async function nextSignal"));
+    const nextStart = agent.indexOf("export async function nextSignal");
+    const nextEnd = agent.indexOf("\nasync function safeGithubContext", nextStart);
+    const next = agent.slice(nextStart, nextEnd === -1 ? undefined : nextEnd);
     assert.match(next, /planQueueMaintenance/);
     assert.match(next, /withDatabaseTimeout/);
+    assert.match(next, /OPERATOR_WORKER_DB_TIMEOUT_MS/);
     assert.match(next, /fail_reason/);
     assert.match(next, /attempt_count/);
+    assert.equal(next.includes("ensureOperatorSchema"), false);
     assert.equal(next.includes("order by created_at\n      for update skip locked"), false);
     assert.match(agent, /alter table rmf_agent_signals add column if not exists attempt_count/);
     assert.match(agent, /alter table rmf_agent_signals add column if not exists fail_reason/);
   });
 
-  it("worker maps a hung claim to 504 and heartbeat stays enqueue-only", () => {
+  it("worker maps hung claim and overall run to 504 JSON; heartbeat stays enqueue-only", () => {
     const run = readFileSync(join(ROOT, "app/api/operator/run/route.ts"), "utf8");
     const heartbeat = readFileSync(join(ROOT, "app/api/operator/heartbeat/route.ts"), "utf8");
     assert.match(run, /isDatabaseTimeoutError/);
+    assert.match(run, /isWorkerTimeoutError/);
+    assert.match(run, /withWorkerTimeout/);
+    assert.match(run, /worker_timeout/);
+    assert.match(run, /database_timeout/);
     assert.match(run, /status:\s*504/);
     assert.match(run, /runOneSignal/);
+    assert.match(run, /OPERATOR_WORKER_TIMEOUT_MS/);
     assert.equal(heartbeat.includes("runOneSignal"), false);
     assert.equal(heartbeat.includes("planQueueMaintenance"), false);
     assert.match(heartbeat, /enqueueSignalIdempotent/);

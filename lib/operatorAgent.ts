@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { db, DB_OPERATION_TIMEOUT_MS, newSchemaSlot, runOncePerDbClient, withDatabaseTimeout } from "./db";
+import {
+  db,
+  OPERATOR_SCHEMA_TIMEOUT_MS,
+  OPERATOR_WORKER_DB_TIMEOUT_MS,
+  newSchemaSlot,
+  runOncePerDbClient,
+  withDatabaseTimeout
+} from "./db";
 import { planQueueMaintenance, SIGNAL_MAX_ATTEMPTS, type QueueSignal } from "./operatorQueue";
 import {
   classifyCycle,
@@ -50,6 +57,7 @@ function errorMessage(error: unknown): string {
 
 export async function ensureOperatorSchema(): Promise<void> {
   return runOncePerDbClient(schemaSlot, async () => {
+    await withDatabaseTimeout(async () => {
     const sql = db();
     await sql`
       create table if not exists rmf_agent_signals(
@@ -176,6 +184,7 @@ export async function ensureOperatorSchema(): Promise<void> {
         vercel_project_id=coalesce(excluded.vercel_project_id,rmf_agent_projects.vercel_project_id),
         updated_at=now()
     `;
+    }, OPERATOR_SCHEMA_TIMEOUT_MS);
   });
 }
 
@@ -291,7 +300,6 @@ function asQueueSignal(row: Record<string, unknown>): QueueSignal {
  */
 export async function nextSignal() {
   return withDatabaseTimeout(async () => {
-    await ensureOperatorSchema();
     const sql = db();
 
     // Platform can kill a worker before the catch block. Fail the run row; do not
@@ -351,7 +359,7 @@ export async function nextSignal() {
       returning *
     `;
     return result[0] || null;
-  }, DB_OPERATION_TIMEOUT_MS);
+  }, OPERATOR_WORKER_DB_TIMEOUT_MS);
 }
 
 async function safeGithubContext(): Promise<Record<string, unknown>> {
@@ -363,7 +371,6 @@ async function safeGithubContext(): Promise<Record<string, unknown>> {
 }
 
 export async function operatorContext() {
-  await ensureOperatorSchema();
   const sql = db();
   const [ctx, recent, projects, gpts, runtime, github] = await Promise.all([
     sql`select key,value,updated_at from rmf_agent_context order by key`,
@@ -392,7 +399,6 @@ export async function ledger(
   capability?: string,
   admissible = true
 ) {
-  await ensureOperatorSchema();
   const sql = db();
   await sql`
     insert into rmf_agent_ledger(run_id,event,capability,authority,admissible,detail)
@@ -449,7 +455,7 @@ export async function gatewayPlan(input: unknown) {
   if (!key) throw new Error("AI_GATEWAY_API_KEY_not_configured");
   const model = process.env.RMF_OPERATOR_MODEL || "openai/gpt-5.6-terra";
   const registry = getOperatorToolRegistry();
-  const timeoutMs = Math.max(3000, Math.min(45000, Number(process.env.RMF_OPERATOR_GATEWAY_TIMEOUT_MS || 15000)));
+  const timeoutMs = Math.max(3000, Math.min(20_000, Number(process.env.RMF_OPERATOR_GATEWAY_TIMEOUT_MS || 15000)));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;

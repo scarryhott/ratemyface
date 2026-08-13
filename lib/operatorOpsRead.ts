@@ -278,49 +278,60 @@ function billingFromEnvOnly() {
   };
 }
 
+function envOnlyOpsPayload(reason?: string) {
+  const billing = billingFromEnvOnly();
+  return {
+    ok: true as const,
+    database_configured: databaseConfigured(),
+    counts_available: false,
+    ops_read_error: reason || (databaseConfigured() ? undefined : "database_not_configured"),
+    generated_at: new Date().toISOString(),
+    counts: { projects: 0, runs: 0, signals: 0, ledger: 0, gpts: 0, receipts: 0, approvals_pending: 0, approvals_total: 0 },
+    accounts: { auth_users: 0, oauth_users: 0, active_oauth_tokens: 0 },
+    portfolio: { active_gpts: 0, draft_gpts: 0, public_gpts: 0, action_gpts: 0, amazon_linked_gpts: 0 },
+    commerce: { amazon: null },
+    billing,
+    infrastructure: infrastructureCreditBoundary(),
+    projects: [],
+    recent_runs: [] as unknown[],
+    recent_signals: [] as unknown[],
+    recent_ledger: [] as unknown[],
+    gpts: [],
+    recent_receipts: [] as unknown[],
+    recent_approvals: [] as unknown[],
+    external_metrics: {
+      amazon_associates: { status: "snapshot_unavailable", note: "No stored Amazon Associates snapshot is available." },
+      vercel_hosting: {
+        status: "hobby_active",
+        note: infrastructureCreditBoundary().vercel_hosting.note
+      },
+      vercel_ai_gateway: {
+        status: "not_product_credits",
+        note: infrastructureCreditBoundary().vercel_ai_gateway.note
+      },
+      vercel_analytics: { status: "connect_later", note: "Live Vercel analytics are not persisted in Postgres yet." },
+      railway_browser: {
+        status: process.env.RMF_BROWSER_CONTROL_URL ? "configured" : "connect_later",
+        note: process.env.RMF_BROWSER_CONTROL_URL
+          ? "Browser control URL is configured; live Railway metrics are not ingested into Postgres yet."
+          : "Railway browser control is not configured."
+      },
+      stripe_product_credits: {
+        status: billing.stripe.secret_configured && billing.stripe.credit_price_configured && billing.stripe.webhook_configured ? "configured" : "partial",
+        note: billing.revenue_mapping
+      }
+    }
+  };
+}
+
+/** Timeout / missing-DB ops payload. Counts are not live — callers must show UNAVAILABLE, not zeros. */
+export function unavailableOperatorOpsRead(reason = "database_timeout") {
+  return envOnlyOpsPayload(reason);
+}
+
 export async function getOperatorOpsRead() {
   if (!databaseConfigured()) {
-    const billing = billingFromEnvOnly();
-    return {
-      ok: true,
-      database_configured: false,
-      generated_at: new Date().toISOString(),
-      counts: { projects: 0, runs: 0, signals: 0, ledger: 0, gpts: 0, receipts: 0, approvals_pending: 0, approvals_total: 0 },
-      accounts: { auth_users: 0, oauth_users: 0, active_oauth_tokens: 0 },
-      portfolio: { active_gpts: 0, draft_gpts: 0, public_gpts: 0, action_gpts: 0, amazon_linked_gpts: 0 },
-      commerce: { amazon: null },
-      billing,
-      infrastructure: infrastructureCreditBoundary(),
-      projects: [],
-      recent_runs: [],
-      recent_signals: [],
-      recent_ledger: [],
-      gpts: [],
-      recent_receipts: [],
-      recent_approvals: [],
-      external_metrics: {
-        amazon_associates: { status: "snapshot_unavailable", note: "No stored Amazon Associates snapshot is available." },
-        vercel_hosting: {
-          status: "hobby_active",
-          note: infrastructureCreditBoundary().vercel_hosting.note
-        },
-        vercel_ai_gateway: {
-          status: "not_product_credits",
-          note: infrastructureCreditBoundary().vercel_ai_gateway.note
-        },
-        vercel_analytics: { status: "connect_later", note: "Live Vercel analytics are not persisted in Postgres yet." },
-        railway_browser: {
-          status: process.env.RMF_BROWSER_CONTROL_URL ? "configured" : "connect_later",
-          note: process.env.RMF_BROWSER_CONTROL_URL
-            ? "Browser control URL is configured; live Railway metrics are not ingested into Postgres yet."
-            : "Railway browser control is not configured."
-        },
-        stripe_product_credits: {
-          status: billing.stripe.secret_configured && billing.stripe.credit_price_configured && billing.stripe.webhook_configured ? "configured" : "partial",
-          note: billing.revenue_mapping
-        }
-      }
-    };
+    return envOnlyOpsPayload("database_not_configured");
   }
 
   const sql = db();
@@ -377,6 +388,7 @@ export async function getOperatorOpsRead() {
     return {
       ok: true,
       database_configured: true,
+      counts_available: true,
       generated_at: new Date().toISOString(),
       counts: {
         projects: asNumber(projectCount[0]?.total),

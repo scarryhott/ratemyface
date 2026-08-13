@@ -3,10 +3,19 @@ import {
   businessImproveGoal,
   snapshotBusinessMetrics
 } from "../../../../lib/agentBusinessLoop";
+import {
+  OPERATOR_WORKER_DB_TIMEOUT_MS,
+  OPERATOR_WORKER_TIMEOUT_MS,
+  isDatabaseTimeoutError,
+  isUndefinedTableError,
+  isWorkerTimeoutError,
+  withWorkerTimeout
+} from "../../../../lib/db";
 import { enqueueSignal, runOneSignal } from "../../../../lib/operatorAgent";
 import { operatorRequestAuthorized } from "../../../../lib/operatorOwnerAuth";
 
 export const runtime = "nodejs";
+/** Platform backstop only — runOneSignal is still bounded by withWorkerTimeout. */
 export const maxDuration = 60;
 
 /**
@@ -48,12 +57,30 @@ export async function POST(request: NextRequest) {
   let run: any = null;
   if (runNow) {
     try {
-      run = await runOneSignal();
-    } catch (error: any) {
+      run = await withWorkerTimeout(() => runOneSignal(), OPERATOR_WORKER_TIMEOUT_MS);
+    } catch (error: unknown) {
+      if (isWorkerTimeoutError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "worker_timeout", timeout_ms: OPERATOR_WORKER_TIMEOUT_MS, signal, actor: auth.actor },
+          { status: 504 }
+        );
+      }
+      if (isDatabaseTimeoutError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "database_timeout", timeout_ms: OPERATOR_WORKER_DB_TIMEOUT_MS, signal, actor: auth.actor },
+          { status: 504 }
+        );
+      }
+      if (isUndefinedTableError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "schema_not_ready", signal, actor: auth.actor },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         {
           ok: false,
-          error: String(error?.message || error),
+          error: String((error as { message?: string })?.message || error),
           signal,
           actor: auth.actor
         },
@@ -109,10 +136,28 @@ export async function PUT(request: NextRequest) {
   let run: any = null;
   if (runNow) {
     try {
-      run = await runOneSignal();
-    } catch (error: any) {
+      run = await withWorkerTimeout(() => runOneSignal(), OPERATOR_WORKER_TIMEOUT_MS);
+    } catch (error: unknown) {
+      if (isWorkerTimeoutError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "worker_timeout", timeout_ms: OPERATOR_WORKER_TIMEOUT_MS, signal, actor: auth.actor },
+          { status: 504 }
+        );
+      }
+      if (isDatabaseTimeoutError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "database_timeout", timeout_ms: OPERATOR_WORKER_DB_TIMEOUT_MS, signal, actor: auth.actor },
+          { status: 504 }
+        );
+      }
+      if (isUndefinedTableError(error)) {
+        return NextResponse.json(
+          { ok: false, error: "schema_not_ready", signal, actor: auth.actor },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
-        { ok: false, error: String(error?.message || error), signal, actor: auth.actor },
+        { ok: false, error: String((error as { message?: string })?.message || error), signal, actor: auth.actor },
         { status: 500 }
       );
     }

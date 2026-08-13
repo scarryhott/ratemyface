@@ -33,6 +33,8 @@ type DashboardPayload = {
   ok: boolean;
   version?: string;
   database_configured?: boolean;
+  counts_available?: boolean;
+  ops_read_error?: string;
   generated_at?: string;
   actor?: string;
   owner?: Owner | null;
@@ -83,7 +85,18 @@ export default function OperatorDashboardV2() {
         ok: false,
         error: `HTTP_${response.status}`
       }))) as DashboardPayload;
-      if (!response.ok) throw new Error(body.error || `HTTP_${response.status}`);
+      if (!response.ok) {
+        if (body.error === "database_timeout") {
+          setData({
+            ok: true,
+            counts_available: false,
+            ops_read_error: "database_timeout",
+            error: "database_timeout"
+          });
+          return;
+        }
+        throw new Error(body.error || `HTTP_${response.status}`);
+      }
       setData(body);
       if (body.owner) setOwner(body.owner);
     } catch (err) {
@@ -212,6 +225,16 @@ export default function OperatorDashboardV2() {
       {error && (
         <section className="card" style={{ borderColor: "#f04438" }}>
           <strong>Dashboard error:</strong> {error}
+        </section>
+      )}
+      {data?.counts_available === false && (
+        <section className="card">
+          <strong>Ops counts UNAVAILABLE</strong>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            {data.ops_read_error === "database_timeout"
+              ? "Postgres did not respond in time. Timed-out reads are not live zeros."
+              : data.ops_read_error || "Operator metrics could not be loaded."}
+          </p>
         </section>
       )}
 
