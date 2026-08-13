@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.6",
+      version: "3.0.0",
       description:
-        "FREE product links + credit-metered account learning, Compare Me To Me, and Appearance. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
+        "FREE product links + credit-metered personal evidence: account learning, history retrieval, product/social outcomes, references, experiments, Compare, Appearance, and a bounded approval-gated agent. Never turn insufficient or tied evidence into a conclusion. On 402 MUST call createCreditCheckoutSession same turn."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
             {
               name: "mode",
               in: "query",
-              schema: { type: "string", enum: ["profile", "history", "saved", "connections", "report"], default: "profile" }
+              schema: { type: "string", enum: ["profile", "history", "saved", "connections", "what_works", "report"], default: "profile" }
             },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
           ],
@@ -196,6 +196,195 @@ export async function GET(request: NextRequest) {
               description: "Credits required",
               content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
             }
+          }
+        }
+      },
+      "/api/experiments": {
+        get: {
+          operationId: "getPersonalExperiments",
+          summary: "PAID/METERED — read my Personal Experiments (1 credit)",
+          description:
+            "Read my A/B experiments and current evidence closure: insufficient, tied, favors_a, or favors_b. Directional results are provisional personal evidence, never causal or medical claims. Costs 1 credit. On 402 MUST call createCreditCheckoutSession same turn.",
+          parameters: [
+            {
+              name: "experiment_id",
+              in: "query",
+              schema: { type: "integer", minimum: 1 },
+              description: "Optional single experiment id. Omit to list recent experiments."
+            },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
+          ],
+          responses: {
+            "200": { description: "Experiment(s), outcomes, and explicit evidence state" },
+            "401": { description: "OAuth required" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        },
+        post: {
+          operationId: "updatePersonalExperiment",
+          summary: "PAID/METERED — define, record, or complete a Personal Experiment (1 credit)",
+          description:
+            "With consent, create a two-option experiment, record a 1-5 outcome for a or b, or complete it. Recalculates evidence without turning insufficient or tied evidence into a conclusion. Costs 1 credit. On 402 MUST call createCreditCheckoutSession same turn.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalExperimentRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted experiment with recalculated evidence closure" },
+            "400": { description: "Invalid operation, consent, definition, option, score, or timestamp" },
+            "401": { description: "OAuth required" },
+            "404": { description: "Experiment not found for this user" },
+            "409": { description: "Experiment is no longer active" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        }
+      },
+      "/api/history/ask": {
+        post: {
+          operationId: "askMyHistory",
+          summary: "PAID/METERED — answer from my stored evidence (1 credit)",
+          description:
+            "Retrieve only from the signed-in user's saved interactions, recommendations, experiments, outcomes, references, and verified agent receipts. Never substitute chat memory or web guesses. An unmatched question returns insufficient. On 402 MUST call createCreditCheckoutSession same turn.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/HistoryQuestionRequest" } } }
+          },
+          responses: {
+            "200": { description: "Evidence-linked answer or explicit insufficient state" },
+            "401": { description: "OAuth required" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        }
+      },
+      "/api/products/outcomes": {
+        get: {
+          operationId: "getProductLearning",
+          summary: "PAID/METERED — learn from my product outcomes (1 credit)",
+          description:
+            "Read per-product personal outcome closure: insufficient, works, mixed, or did_not_work, plus overall insufficient/tied/favored state. No causal, population, or medical claim. On 402 MUST call createCreditCheckoutSession same turn.",
+          responses: {
+            "200": { description: "Outcome-aware product learning" },
+            "401": { description: "OAuth required" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        },
+        post: {
+          operationId: "recordProductOutcome",
+          summary: "PAID/METERED — record how a saved product worked (1 credit)",
+          description:
+            "With explicit consent, attach a 1-5 outcome to one of the user's saved product recommendations, then recalculate learning without manufacturing confidence.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ProductOutcomeRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted outcome and recalculated learning" },
+            "400": { description: "Invalid consent, recommendation, score, or timestamp" },
+            "404": { description: "Saved recommendation not found" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        }
+      },
+      "/api/social/outcomes": {
+        get: {
+          operationId: "getSocialOutcomeIntelligence",
+          summary: "PAID/METERED — read authorized social outcome trends (1 credit)",
+          description:
+            "Read personal metric trends from user-recorded or OAuth-provider-authorized observations. Scraping is always false; trend is not causation.",
+          responses: {
+            "200": { description: "Social trend relations with explicit insufficient/tied/directional states" },
+            "401": { description: "OAuth required" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        },
+        post: {
+          operationId: "recordSocialOutcome",
+          summary: "PAID/METERED — record an authorized social metric (1 credit)",
+          description:
+            "With explicit consent, record an Instagram, LinkedIn, or TikTok metric. provider_authorized requires a connected OAuth provider; user_recorded is manual. Never scrape.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SocialOutcomeRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted metric and recalculated trends" },
+            "400": { description: "Invalid consent or metric" },
+            "409": { description: "provider_authorized selected without an active provider connection" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        }
+      },
+      "/api/references": {
+        get: {
+          operationId: "getReferenceComparisons",
+          summary: "PAID/METERED — read my chosen reference comparisons (1 credit)",
+          description:
+            "Read paired self/reference scores with insufficient, tied, self_higher, or reference_higher closure. Descriptive only: no identity, intrinsic-worth, causal, or population claim.",
+          parameters: [
+            { name: "comparison_id", in: "query", schema: { type: "integer", minimum: 1 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
+          ],
+          responses: {
+            "200": { description: "Reference comparisons and explicit evidence closure" },
+            "401": { description: "OAuth required" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        },
+        post: {
+          operationId: "updateReferenceComparison",
+          summary: "PAID/METERED — create, observe, or complete a reference comparison (1 credit)",
+          description:
+            "With explicit consent, create a distinct chosen reference, record paired 1-5 scores, or complete it. Completion never turns sparse or tied evidence into a direction.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ReferenceComparisonRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted reference relation and recalculated closure" },
+            "400": { description: "Invalid consent, operation, definition, scores, or timestamp" },
+            "404": { description: "Reference comparison not found" },
+            "409": { description: "Reference comparison no longer active" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        }
+      },
+      "/api/personal-agent": {
+        get: {
+          operationId: "getPersonalAgentRuns",
+          summary: "PAID/METERED — read bounded agent runs and receipts (1 credit)",
+          description:
+            "Read the user's agent plans, explicit approval state, and verification receipts. The agent has authority 0 for reads and no unapproved write or external authority.",
+          parameters: [
+            { name: "run_id", in: "query", schema: { type: "integer", minimum: 1 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } }
+          ],
+          responses: {
+            "200": { description: "Runs, actions, and receipts" },
+            "401": { description: "OAuth required" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
+          }
+        },
+        post: {
+          operationId: "updatePersonalAgent",
+          summary: "PAID/METERED — run, decide, or close a bounded agent action (1 credit)",
+          description:
+            "run performs autonomous read-only history retrieval and proposes the smallest next evidence action. decide records explicit approval or rejection. complete requires an approved action and verifies an own-row evidence_ref before closing. Never claim an approved proposal executed by itself.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalAgentRequest" } } }
+          },
+          responses: {
+            "200": { description: "Run, decision, or verified completion receipt" },
+            "400": { description: "Invalid consent or request" },
+            "404": { description: "Agent action not found" },
+            "409": { description: "Approval or evidence receipt state does not permit the transition" },
+            "402": { description: "Credits required", content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } } }
           }
         }
       }
@@ -326,6 +515,114 @@ export async function GET(request: NextRequest) {
               maxLength: 2000,
               description: "After image HTTPS URL or stored ref. Required unless already on the user's profile."
             }
+          }
+        },
+        PersonalExperimentRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["operation", "consent_experiment"],
+          properties: {
+            operation: {
+              type: "string",
+              enum: ["create", "record_outcome", "complete"],
+              description:
+                "create requires title and both option labels; record_outcome requires experiment_id, option_key, and score; complete requires experiment_id."
+            },
+            consent_experiment: {
+              type: "boolean",
+              const: true,
+              description: "Explicit consent to persist this personal experiment or outcome."
+            },
+            title: { type: "string", maxLength: 200 },
+            option_a_label: { type: "string", maxLength: 120 },
+            option_b_label: { type: "string", maxLength: 120 },
+            metric_label: {
+              type: "string",
+              maxLength: 120,
+              description: "What the 1-5 score means, such as confidence or skin comfort."
+            },
+            experiment_id: { type: "integer", minimum: 1 },
+            option_key: { type: "string", enum: ["a", "b"] },
+            score: {
+              type: "integer",
+              minimum: 1,
+              maximum: 5,
+              description: "The user's recorded outcome; higher means better on metric_label."
+            },
+            note: { type: "string", maxLength: 500 },
+            observed_at: { type: "string", format: "date-time" }
+          }
+        },
+        HistoryQuestionRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["question"],
+          properties: {
+            question: { type: "string", maxLength: 500 },
+            limit: { type: "integer", minimum: 1, maximum: 12, default: 8 }
+          }
+        },
+        ProductOutcomeRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["consent_product_outcome", "recommendation_id", "score"],
+          properties: {
+            consent_product_outcome: { type: "boolean", const: true },
+            recommendation_id: { type: "integer", minimum: 1 },
+            score: { type: "integer", minimum: 1, maximum: 5 },
+            note: { type: "string", maxLength: 500 },
+            observed_at: { type: "string", format: "date-time" }
+          }
+        },
+        SocialOutcomeRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["consent_social_outcome", "provider", "metric_label", "metric_value"],
+          properties: {
+            consent_social_outcome: { type: "boolean", const: true },
+            provider: { type: "string", enum: ["instagram", "linkedin", "tiktok"] },
+            metric_label: { type: "string", maxLength: 120 },
+            metric_value: { type: "number" },
+            context_label: { type: "string", maxLength: 200 },
+            source_kind: { type: "string", enum: ["user_recorded", "provider_authorized"], default: "user_recorded" },
+            external_ref_hash: { type: "string", maxLength: 200, description: "Optional opaque hash only; never raw provider content." },
+            observed_at: { type: "string", format: "date-time" }
+          }
+        },
+        ReferenceComparisonRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["operation", "consent_reference"],
+          properties: {
+            operation: { type: "string", enum: ["create", "record_observation", "complete"] },
+            consent_reference: { type: "boolean", const: true },
+            title: { type: "string", maxLength: 200 },
+            reference_label: { type: "string", maxLength: 120 },
+            metric_label: { type: "string", maxLength: 120 },
+            comparison_id: { type: "integer", minimum: 1 },
+            self_score: { type: "integer", minimum: 1, maximum: 5 },
+            reference_score: { type: "integer", minimum: 1, maximum: 5 },
+            note: { type: "string", maxLength: 500 },
+            observed_at: { type: "string", format: "date-time" }
+          }
+        },
+        PersonalAgentRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["operation", "consent_agent"],
+          properties: {
+            operation: { type: "string", enum: ["run", "decide", "complete"] },
+            consent_agent: { type: "boolean", const: true },
+            goal: { type: "string", maxLength: 500 },
+            run_id: { type: "integer", minimum: 1 },
+            action_id: { type: "integer", minimum: 1 },
+            approve: { type: "boolean" },
+            evidence_ref: {
+              type: "string",
+              maxLength: 120,
+              description: "Own-row receipt ref: product_outcome:<id>, social_outcome:<id>, reference_comparison:<id>, or personal_experiment:<id>."
+            },
+            outcome_summary: { type: "string", maxLength: 500 }
           }
         },
         CreditsRequiredResponse: {

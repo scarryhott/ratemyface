@@ -14,6 +14,7 @@ import {
   stripeWebhookConfigured
 } from "../../../../lib/stripeBilling";
 import { PERSONAL_ACTION_COST, REPORT_ACTION_COST } from "../../../../lib/personalNetwork";
+import { PERSONAL_EXPERIMENT_ACTION_COST } from "../../../../lib/personalExperimentEvidence";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     memory_context: MEMORY_CONTEXT_COST,
     compare_me_to_me: PERSONAL_ACTION_COST,
     appearance_agent: PERSONAL_ACTION_COST,
+    personal_experiments: PERSONAL_EXPERIMENT_ACTION_COST,
     report: REPORT_ACTION_COST
   };
 

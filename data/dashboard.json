@@ -1,5 +1,130 @@
 {
-  "updated_at": "2026-08-13T12:31:00Z",
+  "updated_at": "2026-08-13T21:16:35Z",
+  "vital_stats": [
+    {
+      "label": "Available or ready",
+      "value": 13,
+      "note": "3 live · 2 paid · 8 ready"
+    },
+    {
+      "label": "Account users",
+      "value": 1,
+      "note": "1 persistent personal profile"
+    },
+    {
+      "label": "Saved history",
+      "value": 4,
+      "note": "2 interactions · 2 recommendations"
+    },
+    {
+      "label": "Credit balance",
+      "value": 92,
+      "note": "8 lifetime credits spent"
+    },
+    {
+      "label": "Compare results",
+      "value": 1,
+      "note": "1 stored job · vision remains limited"
+    },
+    {
+      "label": "Credits purchased",
+      "value": 0,
+      "note": "Purchase-to-credit closure is not yet demonstrated"
+    }
+  ],
+  "features": [
+    {
+      "name": "Product Search",
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "Free Amazon product discovery with tagged fallback links and no invented product identity, price, or ASIN.",
+      "stats": ["Free action", "Affiliate attribution active"]
+    },
+    {
+      "name": "Account Learning",
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "OAuth-backed personal profiles, interaction history, saved recommendations, and credit-metered persistence.",
+      "stats": ["1 profile", "2 interactions", "2 recommendations"]
+    },
+    {
+      "name": "What Works For Me",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Synthesizes saved preferences and demonstrated outcomes without turning sparse evidence into false confidence.",
+      "stats": ["PR #37", "Evidence confidence states"]
+    },
+    {
+      "name": "Compare Me To Me",
+      "status": "PAID",
+      "tone": "paid",
+      "summary": "Compares a user's own before-and-after evidence and returns an honest limited result when vision cannot run.",
+      "stats": ["1 credit", "1 job", "1 result", "Vision limited"]
+    },
+    {
+      "name": "Appearance Agent",
+      "status": "PAID",
+      "tone": "paid",
+      "summary": "Builds a 90-day appearance plan and check-ins from Account Learning and Compare history.",
+      "stats": ["1 credit", "90-day plan", "History required", "0 plans yet"]
+    },
+    {
+      "name": "Personal Experiments",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Tracks user-defined A/B outcomes with explicit insufficient, tied, favors A, or favors B evidence closure.",
+      "stats": ["PR #38", "2 outcomes per option", "1 credit per write", "0 experiments yet"]
+    },
+    {
+      "name": "Social OAuth",
+      "status": "LIVE",
+      "tone": "live",
+      "summary": "User-authorized TikTok OAuth is configured; no account is connected yet, Instagram and LinkedIn remain unconfigured, and scraping stays disabled.",
+      "stats": ["TikTok configured", "0 connected", "No scraping"]
+    },
+    {
+      "name": "Ask My History",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Answers from the user's own saved evidence and returns insufficient when no stored record matches.",
+      "stats": ["1 credit", "7 evidence sources", "No web guessing"]
+    },
+    {
+      "name": "Outcome-aware Product Learning",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Learns from recorded outcomes on saved products while keeping sparse and tied evidence explicit.",
+      "stats": ["1 credit", "2 outcomes minimum", "1–5 personal score"]
+    },
+    {
+      "name": "Social Outcome Intelligence",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Relates user-recorded or provider-authorized metric trends without scraping or causal inference.",
+      "stats": ["1 credit", "4 observations minimum", "Scraping off"]
+    },
+    {
+      "name": "Reference Comparison",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Compares paired scores with a distinct chosen reference while bounding identity, worth, and causality claims.",
+      "stats": ["1 credit", "2 paired observations", "No identity claim"]
+    },
+    {
+      "name": "Personal Network / MCP Expansion",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Exposes five bounded read tools for a single server-scoped user; personal writes remain OAuth-only.",
+      "stats": ["5 MCP reads", "Single-user scope", "0 MCP writes"]
+    },
+    {
+      "name": "Autonomous Personal Agent",
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Autonomously reads evidence and proposes the smallest next step; writes require approval and verified receipts.",
+      "stats": ["Authority 0 reads", "Approval-gated writes", "Verified receipts"]
+    }
+  ],
   "summary": {
     "status": "openapi_v2_5_3_live_account_learning_active_bootstrap_credits_consuming_purchase_closure_unverified",
     "goal": "Differentiate Rate My Face from default ChatGPT through authenticated cross-session state, verified affiliate routing, and server-enforced paid persistence while preserving a useful free experience."
@@ -41,9 +166,10 @@
     "premium_subscription": "not configured; STRIPE_PRICE_ID_PREMIUM is absent and premium subscription must not be advertised",
     "security": "RLS is now enabled on all listed public Rate My Face tables. Supabase security advisor still reports several server/ops tables with RLS enabled but no policies, and leaked-password protection is disabled; these are follow-up hardening items rather than the previous broad RLS-disabled exposure",
     "signup_credit_policy": "PR #16 is merged. Default first-account bootstrap is 100 credits unless RMF_SIGNUP_CREDITS=0; credits use the same durable ledger as purchased credits and do not count as lifetime_purchased",
-    "social_provider_connections": "OAuth skeleton remains not configured/live; Instagram/LinkedIn/TikTok connect stubs are OAuth-only and scraping remains disabled",
+    "social_provider_connections": "TikTok user-authorized OAuth is configured; Instagram and LinkedIn remain not configured; 0 accounts connected; scraping remains disabled",
     "appearance_agent": "paid appearancePlan / appearanceCheckin Actions (OAuth + 1 credit); not LIVE unlimited coaching; unauthenticated is 401",
-    "compare_me_to_me": "paid compareMeToMe Action (OAuth + 1 credit); unauthenticated is 401; jobs listing stays 503"
+    "compare_me_to_me": "paid compareMeToMe Action (OAuth + 1 credit); unauthenticated is 401; jobs listing stays 503",
+    "personal_experiments": "paid getPersonalExperiments / updatePersonalExperiment Actions (OAuth + 1 credit); explicit insufficient/tied/directional evidence closure"
   },
   "action_classification": {
     "searchProduct": "FREE",
@@ -56,6 +182,17 @@
     "compareMeToMe": "PAID",
     "appearancePlan": "PAID",
     "appearanceCheckin": "PAID",
+    "getPersonalExperiments": "PAID",
+    "updatePersonalExperiment": "PAID",
+    "askMyHistory": "PAID",
+    "getProductLearning": "PAID",
+    "recordProductOutcome": "PAID",
+    "getSocialOutcomeIntelligence": "PAID",
+    "recordSocialOutcome": "PAID",
+    "getReferenceComparisons": "PAID",
+    "updateReferenceComparison": "PAID",
+    "getPersonalAgentRuns": "PAID",
+    "updatePersonalAgent": "PAID",
     "deleteUserContext": "ACCOUNT/SECURITY"
   },
   "quality_review": {

@@ -1,62 +1,113 @@
 import dashboard from "../../data/dashboard.json";
 
-function value(v: unknown) {
-  if (v === null || v === undefined) return "Not connected";
-  if (typeof v === "number") return v.toLocaleString();
-  return String(v);
+type VitalStat = {
+  label: string;
+  value: string | number;
+  note: string;
+};
+
+type FeatureStatus = {
+  name: string;
+  status: "LIVE" | "PAID" | "READY" | "NOT CONFIGURED" | "PLANNED";
+  tone: "live" | "paid" | "ready" | "blocked" | "planned";
+  summary: string;
+  stats: string[];
+};
+
+function FeatureCard({ feature }: { feature: FeatureStatus }) {
+  return (
+    <article className="featureStatusCard">
+      <div className="featureStatusHeader">
+        <h3>{feature.name}</h3>
+        <span className={`featureBadge featureBadge--${feature.tone}`}>{feature.status}</span>
+      </div>
+      <p>{feature.summary}</p>
+      <div className="featureStats" aria-label={`${feature.name} vital stats`}>
+        {feature.stats.map((stat) => (
+          <span key={stat}>{stat}</span>
+        ))}
+      </div>
+    </article>
+  );
 }
 
 export default function DashboardPage() {
-  const metrics = dashboard.metrics as Record<string, unknown>;
-  const integrations = dashboard.integrations as Record<string, unknown>;
+  const vitalStats = dashboard.vital_stats as VitalStat[];
+  const features = dashboard.features as FeatureStatus[];
+  const current = features.filter((feature) => feature.status !== "PLANNED");
+  const available = current.filter((feature) => feature.status !== "NOT CONFIGURED");
+  const planned = features.filter((feature) => feature.status === "PLANNED");
 
   return (
-    <main style={{ maxWidth: 1100 }}>
-      <p><a href="/">← Rate My Face</a></p>
-      <h1>Growth Dashboard</h1>
-      <p>{dashboard.summary.goal}</p>
-      <p><strong>Status:</strong> {dashboard.summary.status} · <strong>Updated:</strong> {dashboard.updated_at}</p>
+    <main className="featureDashboard">
+      <a className="featureDashboardBack" href="/">
+        ← Rate My Face
+      </a>
 
-      <section className="dashboardGrid">
-        {Object.entries(metrics).map(([key, v]) => (
-          <div className="card metricCard" key={key}>
-            <div className="metricLabel">{key.replaceAll("_", " ")}</div>
-            <div className="metricValue">{value(v)}</div>
+      <header className="featureDashboardHero">
+        <div>
+          <p className="featureDashboardEyebrow">Product dashboard</p>
+          <h1>Features and status</h1>
+          <p className="featureDashboardIntro">
+            What exists, what is ready, and the evidence needed to distinguish activity from a conclusion.
+          </p>
+        </div>
+        <div className="featureClosureBadge">
+          <strong>{available.length}</strong>
+          <span>available or ready</span>
+        </div>
+      </header>
+
+      <section aria-labelledby="vital-stats-title">
+        <div className="featureSectionHeading">
+          <div>
+            <p className="featureDashboardEyebrow">Current evidence</p>
+            <h2 id="vital-stats-title">Vital stats</h2>
           </div>
-        ))}
-      </section>
-
-      <section className="card">
-        <h2>Integrations</h2>
-        <div className="statusList">
-          {Object.entries(integrations).map(([key, v]) => (
-            <div key={key}><strong>{key.replaceAll("_", " ")}:</strong> {value(v)}</div>
+          <p>Database snapshot · {dashboard.updated_at}</p>
+        </div>
+        <div className="vitalStatsGrid">
+          {vitalStats.map((stat) => (
+            <article className="vitalStatCard" key={stat.label}>
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+              <p>{stat.note}</p>
+            </article>
           ))}
         </div>
       </section>
 
-      <section className="card">
-        <h2>Current A/B experiment</h2>
-        <p><strong>{dashboard.current_experiment.name}</strong></p>
-        <p>A: {dashboard.current_experiment.variant_a}</p>
-        <p>B: {dashboard.current_experiment.variant_b}</p>
-        <p><strong>Success:</strong> {dashboard.current_experiment.success_metric}</p>
-        <p><strong>Status:</strong> {dashboard.current_experiment.status}</p>
+      <section aria-labelledby="available-features-title">
+        <div className="featureSectionHeading">
+          <div>
+            <p className="featureDashboardEyebrow">Current product</p>
+            <h2 id="available-features-title">Current feature status</h2>
+          </div>
+          <p>LIVE and PAID are available. READY is implemented in an open pull request.</p>
+        </div>
+        <div className="featureStatusGrid">
+          {current.map((feature) => (
+            <FeatureCard feature={feature} key={feature.name} />
+          ))}
+        </div>
       </section>
 
-      <section className="card">
-        <h2>Next actions</h2>
-        <ul>{dashboard.next_actions.map((item) => <li key={item}>{item}</li>)}</ul>
-      </section>
-
-      <section className="card">
-        <h2>Daily reports</h2>
-        {dashboard.daily_reports.length === 0 ? (
-          <p>No daily reports recorded yet.</p>
-        ) : (
-          <pre>{JSON.stringify(dashboard.daily_reports, null, 2)}</pre>
-        )}
-      </section>
+      {planned.length > 0 ? (
+        <section aria-labelledby="planned-features-title">
+          <div className="featureSectionHeading">
+            <div>
+              <p className="featureDashboardEyebrow">Next closure</p>
+              <h2 id="planned-features-title">Planned</h2>
+            </div>
+            <p>Not claimed as implemented.</p>
+          </div>
+          <div className="featureStatusGrid featureStatusGrid--planned">
+            {planned.map((feature) => (
+              <FeatureCard feature={feature} key={feature.name} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
