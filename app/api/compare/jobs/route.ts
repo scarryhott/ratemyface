@@ -3,7 +3,7 @@ import { compareDisabledResponse } from "../../../../lib/compareFeature";
 
 export const runtime = "nodejs";
 
-/** Thin stub for public job listing/create — always 503. Authenticated test is POST /api/compare/test. */
+/** Thin stub for public job listing/create — always 503. Paid Action is POST /api/compare. */
 export async function GET() {
   const { status, body } = compareDisabledResponse(503);
   return NextResponse.json(body, { status });

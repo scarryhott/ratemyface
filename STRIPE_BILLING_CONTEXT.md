@@ -2,7 +2,7 @@
 
 ## Current model
 
-Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.5.4 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations. Premium subscription checkout stays disabled until `STRIPE_PRICE_ID_PREMIUM` is set — do not advertise premium as available in that case.
+Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.5.5 Action surface uses one-time Stripe credit checkout for paid Personal Network, legacy memory, and Compare Me To Me operations. Premium subscription checkout stays disabled until `STRIPE_PRICE_ID_PREMIUM` is set — do not advertise premium as available in that case.
 
 ## Action classifications
 - `searchProduct` — **FREE**. Product/affiliate acquisition path.
@@ -12,6 +12,7 @@ Rate My Face currently exposes a **credit-metered** payment path for advanced pe
 - `updatePersonalNetwork` — **PAID**. Metered persistent profile/history/recommendation/feedback write.
 - `getUserContext` — **PAID**. Legacy metered persistent context.
 - `saveUserContext` — **PAID**. Legacy metered context write plus explicit personalization consent.
+- `compareMeToMe` — **PAID**. Metered before/after compare (1 credit, same unit as Personal Network). Requires OAuth, explicit `consent_compare=true`, and real image refs.
 - `deleteUserContext` — **ACCOUNT/SECURITY**. Never paywalled.
 
 ## Payment closure
@@ -29,7 +30,7 @@ The billing layer maintains subscription-compatible tables plus the active credi
 - `rmf_credit_accounts`
 - `rmf_credit_ledger`
 
-Current code defaults to 100 credits per pack and meters ordinary persistent memory/personal-network operations at 1 credit; reporting may cost more as declared by the endpoint. The authenticated Compare Me To Me **TEST** path (`POST /api/compare/test`) also costs **1 credit** (`compare:authenticated_test`) — history-placeholder analysis, not live vision. It is not an OpenAPI Action; public `/api/compare` stays `503 compare_disabled`.
+Current code defaults to 100 credits per pack and meters Personal Network, Compare Me To Me, and Appearance at **1 credit** (`PERSONAL_ACTION_COST` / `consumeCredits` of 1). Reporting costs 5. Unauthenticated compare is not free (`401`). Missing before/after image refs return `400` rather than fake analysis. The internal history-placeholder path (`POST /api/compare/test`) uses the same 1-credit unit and is not an OpenAPI Action. `/api/compare/jobs` stays `503`.
 
 **Account Learning testing (no Stripe purchase required):**
 1. **Preferred:** founder grant on `/operator/dashboard` → Founder grant (calls `grantCredits` → `rmf_credit_ledger`).
@@ -62,16 +63,17 @@ Never collect raw card data in chat or GitHub, never store Stripe secrets in the
 
 ## Custom GPT schema
 
-The deployed OpenAPI v2.5.4 billing/persistence operations are:
-- `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs, `subscription_available`; `checkout_action` when balance cannot cover the next metered Action)
+The deployed OpenAPI v2.5.5 billing/persistence operations are:
+- `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs including `compare_me_to_me`, `subscription_available`; `checkout_action` when balance cannot cover the next metered Action)
 - `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE (same-turn Action on HTTP 402 / credits_required)
-- `getPersonalNetwork` — PAID (REQUIRED first Action for preference/memory questions; OpenAPI 2.5.4)
+- `getPersonalNetwork` — PAID (REQUIRED first Action for preference/memory questions)
 - `updatePersonalNetwork` — PAID (required on explicit remember/consent)
 - `getUserContext` — PAID
 - `saveUserContext` — PAID
+- `compareMeToMe` — PAID (OAuth + `consent_compare=true` + real before/after image refs; 1 credit, same unit as Personal Network)
 - `deleteUserContext` — ACCOUNT/SECURITY
 
-If the Custom GPT still has an older schema containing `createCheckoutSession` or `createBillingPortalSession`, re-import `https://ratemyface.vercel.app/api/openapi` before relying on the current credit flow. Also re-paste `GPT_INSTRUCTIONS.md` so account-learning Action selection stays forced.
+If the Custom GPT still has an older schema containing `createCheckoutSession` or `createBillingPortalSession`, re-import `https://ratemyface.vercel.app/api/openapi` before relying on the current credit flow. GPT_INSTRUCTIONS.md is not modified for Compare — re-import OpenAPI only; do not paste instructions for this change.
 
 ## Operator dashboard
 

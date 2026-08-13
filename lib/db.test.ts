@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  COMPARE_ACTION_TIMEOUT_MS,
   COMPARE_TEST_DB_TIMEOUT_MS,
   DatabaseTimeoutError,
   dbClientGeneration,
@@ -81,6 +82,18 @@ describe("compare POST hang regression (no live DB)", () => {
     const getHandler = testRoute.slice(testRoute.indexOf("export async function GET"), testRoute.indexOf("export async function POST"));
     assert.equal(getHandler.includes("withDatabaseTimeout"), false);
     assert.equal(getHandler.includes("readCompareLearningSnapshot"), false);
+  });
+
+  it("POST /api/compare (paid Action) bounds work and maps timeout to 504", () => {
+    const compare = readFileSync(join(ROOT, "app/api/compare/route.ts"), "utf8");
+    assert.match(compare, /withDatabaseTimeout/);
+    assert.match(compare, /COMPARE_ACTION_TIMEOUT_MS/);
+    assert.match(compare, /database_timeout/);
+    assert.match(compare, /status:\s*504/);
+    assert.match(compare, /consumeCredits/);
+    assert.match(compare, /consent_compare/);
+    assert.ok(COMPARE_ACTION_TIMEOUT_MS <= 25_000);
+    assert.ok(COMPARE_ACTION_TIMEOUT_MS < 30_000);
   });
 
   it("simulates the POST DB phase hanging before consumeCredits and fails fast", async () => {

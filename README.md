@@ -20,9 +20,9 @@ The backend never invents ASINs.
 - `GET /api/providers` — social provider connection catalog (OAuth skeleton; see `SOCIAL_PROVIDERS.md`).
 - `POST /api/providers/connect` — returns `501 not_configured` until provider credentials exist.
 - `POST /api/providers/disconnect` — revoke stub / soft-revoke when a row exists.
-- `GET|POST /api/compare` — public Compare Me To Me stub (`503 compare_disabled`). Feature stays `enabled=false`.
-- `GET|POST /api/compare/jobs` — public jobs stub (`503 compare_disabled`).
-- `GET|POST /api/compare/test` — **authenticated OAuth / owner / operator TEST only** (not an OpenAPI Action). Costs **1 credit**. Reads existing Account Learning history, persists `rmf_compare_jobs` + `rmf_compare_results`, and writes a follow-up interaction/context note. Unauthenticated callers get the same 503. Not LIVE photo compare.
+- `GET|POST /api/compare` — paid **compareMeToMe** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_compare=true` + real before/after image refs. Unauthenticated callers get `401 oauth_required` (not a free anonymous compare). Vision is limited; missing refs return 400 rather than fake analysis.
+- `GET|POST /api/compare/jobs` — public jobs stub (`503`).
+- `GET|POST /api/compare/test` — **authenticated OAuth / owner / operator TEST only** (not an OpenAPI Action). Costs **1 credit**. History-placeholder analysis from Account Learning. Not a substitute for the paid Action.
 - `GET|POST /api/appearance` — Appearance Agent stub (`503` disabled; not LIVE coaching).
 - `GET|POST /api/appearance/plans` — plan create/get stub (`503` disabled).
 

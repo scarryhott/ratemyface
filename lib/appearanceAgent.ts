@@ -13,7 +13,7 @@ export const APPEARANCE_AGENT = {
   status: "requires_compare_and_learning" as const,
   /** Operator dashboard status badge. */
   dashboard_status: "DISABLED" as const,
-  note: "Scaffold only — not LIVE paid coaching. Depends on Account Learning history + Compare Me To Me (+ optional social). Future paid ops meter via credits.",
+  note: "Scaffold only — not LIVE paid coaching. Depends on Account Learning history + Compare Me To Me (+ optional social). Future paid ops meter via PERSONAL_ACTION_COST (1), the same Stripe credit unit as Personal Network and Compare.",
   gate: "Do NOT enable production until Account Learning history + Compare Me To Me path are ready. Schema may exist; feature remains DISABLED. No OpenAPI Action yet.",
   tables: ["rmf_appearance_plans", "rmf_appearance_checkins"] as const,
   target_days: 90 as const,

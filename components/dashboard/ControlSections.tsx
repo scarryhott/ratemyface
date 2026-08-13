@@ -58,8 +58,8 @@ export function LearningConsoleSection({ data }: { data: LearningConsole }) {
 }
 
 type CompareControl = {
-  status: "DISABLED" | "TESTING" | "LIVE";
-  enabled: false;
+  status: "DISABLED" | "TESTING" | "LIVE" | "PAID";
+  enabled: boolean;
   jobs_queued: MetricValue;
   jobs_running: MetricValue;
   jobs_completed: MetricValue;
@@ -67,6 +67,8 @@ type CompareControl = {
   gate: string;
   future_tables: string[];
   schema_ready?: boolean;
+  vision_status?: string;
+  action_path?: string;
 };
 
 export function CompareControlSection({ data }: { data: CompareControl }) {
@@ -92,12 +94,14 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
           </span>
           <span className="muted">
             enabled={String(data.enabled)} · schema=
-            {data.schema_ready ? "ready" : "pending"} · tables: {data.future_tables.join(", ")}
+            {data.schema_ready ? "ready" : "pending"} · vision=
+            {data.vision_status || "limited"} · tables: {data.future_tables.join(", ")}
           </span>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Public feature remains DISABLED. Status TESTING is the authenticated internal path only
-          (not OpenAPI). Job counts are live table rows — never invented.
+          Paid compareMeToMe Action (OAuth + credits). Status PAID is not a LIVE unlimited-vision
+          marketing claim. Unauthenticated compare is not free. Job counts are live table rows —
+          never invented.
         </p>
         <section style={grid4}>
           <MetricCard label="Jobs queued" metric={data.jobs_queued} />

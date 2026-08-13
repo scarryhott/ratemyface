@@ -13,7 +13,6 @@ import {
   stripeSecretConfigured,
   stripeWebhookConfigured
 } from "../../../../lib/stripeBilling";
-import { COMPARE_TEST_ACTION_COST } from "../../../../lib/compareFeature";
 import { PERSONAL_ACTION_COST, REPORT_ACTION_COST } from "../../../../lib/personalNetwork";
 
 export const runtime = "nodejs";
@@ -34,8 +33,9 @@ export async function GET(request: NextRequest) {
   const metered_costs = {
     personal_network: PERSONAL_ACTION_COST,
     memory_context: MEMORY_CONTEXT_COST,
-    report: REPORT_ACTION_COST,
-    compare_authenticated_test: COMPARE_TEST_ACTION_COST
+    compare_me_to_me: PERSONAL_ACTION_COST,
+    appearance_agent: PERSONAL_ACTION_COST,
+    report: REPORT_ACTION_COST
   };
 
   return NextResponse.json({

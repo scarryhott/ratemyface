@@ -142,16 +142,18 @@ export type DashboardV2 = {
     admin_note: string;
   };
   compare_me_to_me: {
-    status: "DISABLED" | "TESTING" | "LIVE";
-    enabled: false;
+    status: "DISABLED" | "TESTING" | "LIVE" | "PAID";
+    enabled: boolean;
     jobs_queued: MetricValue;
     jobs_running: MetricValue;
     jobs_completed: MetricValue;
     results: MetricValue;
     gate: string;
-    /** Schema table names (may exist while feature stays DISABLED). */
+    /** Schema table names (may exist while vision stays limited). */
     future_tables: string[];
     schema_ready: boolean;
+    vision_status?: string;
+    action_path?: string;
   };
   appearance_agent: {
     status: "DISABLED" | "TESTING" | "LIVE";
@@ -245,7 +247,7 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
         profiles_created: unavailable("Database not configured"),
         interactions_stored: unavailable("Database not configured"),
         recommendations_stored: unavailable("Database not configured"),
-        compare_jobs: metric(0, "Compare Me To Me TESTING — public DISABLED, no live jobs"),
+        compare_jobs: metric(0, "Paid Compare Action — no live jobs (vision limited)"),
         social_connections: unavailable("Database not configured")
       }
     },
@@ -296,13 +298,15 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
     compare_me_to_me: {
       status: COMPARE_ME_TO_ME.dashboard_status,
       enabled: COMPARE_ME_TO_ME.enabled,
-      jobs_queued: metric(0, "TESTING — public DISABLED"),
-      jobs_running: metric(0, "TESTING — public DISABLED"),
-      jobs_completed: metric(0, "TESTING — public DISABLED"),
-      results: unavailable("TESTING — public DISABLED; results unavailable until schema is applied"),
+      jobs_queued: metric(0, "Paid Action — schema not applied"),
+      jobs_running: metric(0, "Paid Action — schema not applied"),
+      jobs_completed: metric(0, "Paid Action — schema not applied"),
+      results: unavailable("Paid Action — results unavailable until schema is applied"),
       gate: COMPARE_ME_TO_ME.gate,
       future_tables: [...COMPARE_ME_TO_ME.tables],
-      schema_ready: false
+      schema_ready: false,
+      vision_status: COMPARE_ME_TO_ME.vision_status,
+      action_path: COMPARE_ME_TO_ME.action_path
     },
     appearance_agent: {
       status: APPEARANCE_AGENT.dashboard_status,
@@ -559,13 +563,13 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         })()
       : unavailable("learning_events table not shipped yet");
 
-    // Public feature stays DISABLED. Authenticated test path may persist jobs.
-    // When tables exist, report live counts (0 or more) — never invent numbers.
-    let compareQueued: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
-    let compareRunning: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
-    let compareCompleted: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
+    // Paid Compare Action. When tables exist, report live counts — never invent numbers.
+    // Status is PAID, not a LIVE unlimited-vision marketing claim.
+    let compareQueued: MetricValue = metric(0, "Paid Action — jobs table not applied (vision limited)");
+    let compareRunning: MetricValue = metric(0, "Paid Action — jobs table not applied (vision limited)");
+    let compareCompleted: MetricValue = metric(0, "Paid Action — jobs table not applied (vision limited)");
     let compareResults: MetricValue = unavailable(
-      "TESTING — public DISABLED; results unavailable until schema is applied"
+      "Paid Action — results unavailable until schema is applied (vision limited)"
     );
     if (hasCompareJobs) {
       const rows = await tx`
@@ -575,18 +579,18 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           count(*) filter (where status = 'completed')::int as completed
         from rmf_compare_jobs
       `;
-      compareQueued = metric(asNumber(rows[0]?.queued), "TESTING — live queued count (public DISABLED)");
-      compareRunning = metric(asNumber(rows[0]?.running), "TESTING — live running count (public DISABLED)");
+      compareQueued = metric(asNumber(rows[0]?.queued), "Paid Action — live queued count (vision limited)");
+      compareRunning = metric(asNumber(rows[0]?.running), "Paid Action — live running count (vision limited)");
       compareCompleted = metric(
         asNumber(rows[0]?.completed),
-        "TESTING — live completed count (public DISABLED)"
+        "Paid Action — live completed count (vision limited)"
       );
     }
     if (hasCompareResults) {
       const rows = await tx`select count(*)::int as total from rmf_compare_results`;
       compareResults = metric(
         asNumber(rows[0]?.total),
-        "TESTING — live results count (public DISABLED)"
+        "Paid Action — live results count (vision limited)"
       );
     }
 
@@ -713,7 +717,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           recommendations_stored: recommendations,
           compare_jobs: hasCompareJobs
             ? compareCompleted
-            : metric(0, "Compare Me To Me TESTING — jobs table not applied (public DISABLED)"),
+            : metric(0, "Paid Compare Action — jobs table not applied (vision limited)"),
           social_connections: socialConnections
         }
       },
@@ -781,7 +785,9 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         results: compareResults,
         gate: COMPARE_ME_TO_ME.gate,
         future_tables: [...COMPARE_ME_TO_ME.tables],
-        schema_ready: hasCompareJobs && hasCompareResults
+        schema_ready: hasCompareJobs && hasCompareResults,
+        vision_status: COMPARE_ME_TO_ME.vision_status,
+        action_path: COMPARE_ME_TO_ME.action_path
       },
       appearance_agent: {
         status: APPEARANCE_AGENT.dashboard_status,

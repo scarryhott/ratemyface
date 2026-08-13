@@ -85,13 +85,12 @@ describe("defaultInteractionSummary", () => {
 });
 
 describe("feature gates stay off", () => {
-  it("Compare Me To Me remains disabled with 503 stub body", () => {
-    assert.equal(COMPARE_ME_TO_ME.enabled, false);
-    assert.equal(COMPARE_ME_TO_ME.status, "testing");
+  it("Compare Me To Me paid Action is on; anonymous listing stays stubbed", () => {
+    assert.equal(COMPARE_ME_TO_ME.enabled, true);
+    assert.equal(COMPARE_ME_TO_ME.status, "paid");
     const stub = compareDisabledResponse(503);
     assert.equal(stub.status, 503);
-    assert.equal(stub.body.enabled, false);
-    assert.equal(stub.body.error, "compare_disabled");
+    assert.equal(stub.body.error, "compare_jobs_not_public");
   });
 
   it("compare test-link is off unless RMF_COMPARE_TEST_LINK=1", () => {
@@ -121,10 +120,11 @@ describe("pipeline wiring (source files)", () => {
     assert.equal(product.includes("saveRecommendation"), false);
   });
 
-  it("/api/compare remains a 503 stub (no job enqueue); test path is /api/compare/test", () => {
+  it("/api/compare is the OAuth Action; /api/compare/jobs stays a 503 stub; test path remains", () => {
     const compare = readFileSync(join(ROOT, "app/api/compare/route.ts"), "utf8");
     const jobs = readFileSync(join(ROOT, "app/api/compare/jobs/route.ts"), "utf8");
-    assert.match(compare, /compareDisabledResponse\(503\)/);
+    assert.match(compare, /oauth_required/);
+    assert.match(compare, /runAuthenticatedCompare/);
     assert.match(jobs, /compareDisabledResponse\(503\)/);
     assert.equal(compare.includes("maybeLinkDisabledCompareJob"), false);
     assert.equal(jobs.includes("maybeLinkDisabledCompareJob"), false);
@@ -132,11 +132,11 @@ describe("pipeline wiring (source files)", () => {
     assert.match(testRoute, /runAuthenticatedCompareTest/);
   });
 
-  it("health still reports compare disabled and documents the learning pipeline", () => {
+  it("health reports paid Compare Action and documents the learning pipeline", () => {
     const health = readFileSync(join(ROOT, "app/api/health/route.ts"), "utf8");
-    assert.match(health, /FEATURE REMAINS DISABLED/);
     assert.match(health, /enabled:\s*COMPARE_ME_TO_ME\.enabled/);
     assert.match(health, /rmf_interactions → rmf_personal_recommendations/);
+    assert.match(health, /compareMeToMe/);
   });
 });
 

@@ -2,10 +2,10 @@
  * Production Account Learning pipeline: meaningful writes → rmf_interactions
  * → rmf_personal_recommendations (when a product URL/title is available).
  *
- * Compare Me To Me stays DISABLED for public GPT/OpenAPI. A queued compare
- * job with source_interaction_id is created only when RMF_COMPARE_TEST_LINK=1.
- * The authenticated history test lives at POST /api/compare/test (not this
- * writer). /api/compare remains a 503 stub.
+ * Paid Compare Me To Me Action lives at POST /api/compare (OpenAPI compareMeToMe).
+ * A queued compare job with source_interaction_id is created only when
+ * RMF_COMPARE_TEST_LINK=1. The internal history test lives at POST /api/compare/test.
+ * Unauthenticated compare is not a free product.
  */
 import {
   asRecord,
