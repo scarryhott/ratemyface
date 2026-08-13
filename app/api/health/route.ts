@@ -62,7 +62,7 @@ export async function GET() {
       table: SOCIAL_PROVIDER_OAUTH.table
     },
     account_learning: {
-      openapi_version: "2.5.3",
+      openapi_version: "2.5.4",
       profile_empty_shape: "found=false + preferences={}",
       retrieve_action: "getPersonalNetwork",
       pipeline: "rmf_interactions → rmf_personal_recommendations",

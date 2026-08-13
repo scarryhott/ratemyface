@@ -51,6 +51,19 @@ export function creditsPerPack(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
 }
 
+/** Checkout hint for getEntitlements: pack size always; checkout_action when balance cannot cover the next metered Action. */
+export function entitlementsCheckoutFields(credits: number, packSize: number, meteredCosts: Record<string, number>) {
+  const costs = Object.values(meteredCosts).filter((n) => Number.isFinite(n) && n > 0);
+  const next_metered_cost = costs.length ? Math.min(...costs) : 1;
+  const checkout_needed = credits <= 0 || credits < next_metered_cost;
+  return {
+    credit_pack_size: packSize,
+    next_metered_cost,
+    checkout_needed,
+    ...(checkout_needed ? { checkout_action: "createCreditCheckoutSession" as const } : {})
+  };
+}
+
 /** Optional one-time non-purchase OAuth bootstrap (0 disables). Default 100 for Account Learning testing. */
 export function signupCredits(): number {
   const raw = process.env.RMF_SIGNUP_CREDITS;

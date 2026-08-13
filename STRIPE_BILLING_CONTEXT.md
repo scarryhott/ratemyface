@@ -2,7 +2,7 @@
 
 ## Current model
 
-Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.5.0 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations. Premium subscription checkout stays disabled until `STRIPE_PRICE_ID_PREMIUM` is set — do not advertise premium as available in that case.
+Rate My Face currently exposes a **credit-metered** payment path for advanced persistent Actions. Legacy subscription-entitlement support remains in backend code, but the deployed OpenAPI v2.5.4 Action surface uses one-time Stripe credit checkout for paid Personal Network and legacy memory operations. Premium subscription checkout stays disabled until `STRIPE_PRICE_ID_PREMIUM` is set — do not advertise premium as available in that case.
 
 ## Action classifications
 - `searchProduct` — **FREE**. Product/affiliate acquisition path.
@@ -62,10 +62,10 @@ Never collect raw card data in chat or GitHub, never store Stripe secrets in the
 
 ## Custom GPT schema
 
-The deployed OpenAPI v2.5.0 billing/persistence operations are:
-- `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs, `subscription_available`)
-- `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE
-- `getPersonalNetwork` — PAID (REQUIRED first Action for preference/memory questions; OpenAPI 2.5.3+)
+The deployed OpenAPI v2.5.4 billing/persistence operations are:
+- `getEntitlements` — PAYMENT-INFRASTRUCTURE (includes plan, pack size, metered costs, `subscription_available`; `checkout_action` when balance cannot cover the next metered Action)
+- `createCreditCheckoutSession` — PAYMENT-INFRASTRUCTURE (same-turn Action on HTTP 402 / credits_required)
+- `getPersonalNetwork` — PAID (REQUIRED first Action for preference/memory questions; OpenAPI 2.5.4)
 - `updatePersonalNetwork` — PAID (required on explicit remember/consent)
 - `getUserContext` — PAID
 - `saveUserContext` — PAID
