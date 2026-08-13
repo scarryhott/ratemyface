@@ -27,7 +27,30 @@ const TOOL_SPECS: Record<OperatorToolName,OperatorToolSpec> = {
 function sha256(v:string){return createHash("sha256").update(v).digest("hex");} function digestJson(v:unknown){return sha256(JSON.stringify(v));}
 function githubConfig(){const repository=process.env.RMF_OPERATOR_GITHUB_REPO||"scarryhott/ratemyface";const [owner,repo]=repository.split("/");if(!owner||!repo)throw new Error("RMF_OPERATOR_GITHUB_REPO_must_be_owner_repo");return{repository,owner,repo,base:process.env.RMF_OPERATOR_GITHUB_BASE||"main",token:process.env.GITHUB_OPERATOR_TOKEN||""};}
 interface GithubResponse{ok:boolean;status:number;data:any}
-async function githubRequest(path:string,init:RequestInit={},requireAuth=false):Promise<GithubResponse>{const cfg=githubConfig();if(requireAuth&&!cfg.token)throw new Error("GITHUB_OPERATOR_TOKEN_not_configured");const headers=new Headers(init.headers||{});headers.set("Accept","application/vnd.github+json");headers.set("X-GitHub-Api-Version","2026-03-10");headers.set("User-Agent","ratemyface-closure-operator");if(cfg.token)headers.set("Authorization",`Bearer ${cfg.token}`);if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");const response=await fetch(`https://api.github.com${path}`,{...init,headers,cache:"no-store"});const text=await response.text();let data:any=null;if(text){try{data=JSON.parse(text)}catch{data={text:text.slice(0,1000)}}}return{ok:response.ok,status:response.status,data};}
+async function githubRequest(path:string,init:RequestInit={},requireAuth=false):Promise<GithubResponse>{
+  const cfg=githubConfig();
+  if(requireAuth&&!cfg.token)throw new Error("GITHUB_OPERATOR_TOKEN_not_configured");
+  const headers=new Headers(init.headers||{});
+  headers.set("Accept","application/vnd.github+json");
+  headers.set("X-GitHub-Api-Version","2026-03-10");
+  headers.set("User-Agent","ratemyface-closure-operator");
+  if(cfg.token)headers.set("Authorization",`Bearer ${cfg.token}`);
+  if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
+  try{
+    const response=await fetch(`https://api.github.com${path}`,{...init,headers,cache:"no-store",signal:controller.signal});
+    const text=await response.text();
+    let data:any=null;
+    if(text){try{data=JSON.parse(text)}catch{data={text:text.slice(0,1000)}}}
+    return{ok:response.ok,status:response.status,data};
+  }catch(error){
+    if(controller.signal.aborted)throw new Error("github_timeout_8000ms");
+    throw error;
+  }finally{
+    clearTimeout(timeout);
+  }
+}
 function assertGithub(r:GithubResponse,op:string){if(!r.ok)throw new Error(`${op}_github_${r.status}:${String(r.data?.message||r.data?.text||"unknown_error").slice(0,500)}`);return r.data;} function encodePath(p:string){return p.split("/").map(encodeURIComponent).join("/");} function decodeGithubContent(d:any){return Buffer.from(String(d?.content||"").replace(/\n/g,""),"base64").toString("utf8");}
 export function getOperatorToolRegistry(){const cfg=githubConfig();const browserConfigured=Boolean(process.env.RMF_BROWSER_CONTROL_URL&&process.env.RMF_BROWSER_CONTROL_TOKEN);const vercelConfigured=Boolean(process.env.VERCEL_URL||process.env.VERCEL_PROJECT_PRODUCTION_URL);const githubWrite=Boolean(cfg.token);return Object.values(TOOL_SPECS).map(spec=>({...spec,configured:spec.name==="github_branch_diagnostic"||spec.name==="github_implementation_dispatch"?githubWrite:spec.name==="browser_observe"?browserConfigured:spec.name==="vercel_observe"?vercelConfigured:true}));}
 export function getOperatorToolSpec(name:string):OperatorToolSpec|null{return (TOOL_SPECS as Record<string,OperatorToolSpec>)[name]||null;}

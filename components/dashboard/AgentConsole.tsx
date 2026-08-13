@@ -24,7 +24,15 @@ type ChatMessage = {
 type AgentsPayload = {
   ok: boolean;
   error?: string;
-  queue?: { signals_queued: number; pending_approvals: number; runs_7d: number; note?: string };
+  counts_available?: boolean;
+  ops_read_error?: string;
+  queue?: {
+    signals_queued: number | null;
+    pending_approvals: number | null;
+    runs_7d: number | null;
+    available?: boolean;
+    note?: string;
+  };
   backlog?: {
     current_item?: any | null;
     last_receipt?: any | null;
@@ -37,9 +45,9 @@ type AgentsPayload = {
     latest: any | null;
     history: any[];
   };
-  recent_signals?: any[];
-  recent_runs?: any[];
-  pending_approvals?: any[];
+  recent_signals?: any[] | null;
+  recent_runs?: any[] | null;
+  pending_approvals?: any[] | null;
   harness?: any;
   metrics?: any;
   commercial_loop?: string;
@@ -80,7 +88,28 @@ export function AgentConsoleSection({
         credentials: "same-origin"
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `HTTP_${response.status}`);
+      if (!response.ok) {
+        if (body.error === "database_timeout" || body.error === "worker_timeout") {
+          setAgents({
+            ok: true,
+            counts_available: false,
+            ops_read_error: body.error,
+            queue: {
+              signals_queued: null,
+              pending_approvals: null,
+              runs_7d: null,
+              available: false,
+              note: "UNAVAILABLE — operator read timed out. These are not live zeros."
+            },
+            recent_runs: null,
+            recent_signals: null,
+            pending_approvals: null,
+            error: body.error
+          });
+          return;
+        }
+        throw new Error(body.error || `HTTP_${response.status}`);
+      }
       setAgents(body as AgentsPayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -216,6 +245,12 @@ export function AgentConsoleSection({
 
   const latest = agents?.strategy?.latest;
   const history = agents?.strategy?.history || [];
+  const countsAvailable = agents?.counts_available === true && agents?.queue?.available !== false;
+  const opsCount = (value: number | null | undefined) => {
+    if (!agents) return "—";
+    if (!countsAvailable || value == null) return "Unavailable";
+    return num(value);
+  };
 
   return (
     <>
@@ -314,10 +349,16 @@ export function AgentConsoleSection({
             {agents?.backlog?.note ||
               "Backlog advances only on a verified production receipt. Heartbeat success is not feature progress."}
           </p>
+          {agents && !countsAvailable ? (
+            <p className="muted" style={{ marginTop: 0, marginBottom: 16 }}>
+              Ops counts UNAVAILABLE
+              {agents.ops_read_error ? ` (${agents.ops_read_error})` : ""}. Timed-out reads are not live zeros.
+            </p>
+          ) : null}
           <h4 style={{ marginBottom: 8 }}>Ops activity (not feature progress)</h4>
-          <FunnelRow label="Queued signals" value={num(agents?.queue?.signals_queued)} />
-          <FunnelRow label="Pending approvals" value={num(agents?.queue?.pending_approvals)} />
-          <FunnelRow label="Runs · 7d" value={num(agents?.queue?.runs_7d)} />
+          <FunnelRow label="Queued signals" value={opsCount(agents?.queue?.signals_queued)} />
+          <FunnelRow label="Pending approvals" value={opsCount(agents?.queue?.pending_approvals)} />
+          <FunnelRow label="Runs · 7d" value={opsCount(agents?.queue?.runs_7d)} />
           <FunnelRow
             label="Harness"
             value={`${agents?.harness?.version || "closure-native-v1"} · L${agents?.harness?.max_authority ?? "?"}`}
@@ -385,7 +426,11 @@ export function AgentConsoleSection({
 
           <div style={{ marginTop: 16 }}>
             <h4 style={{ marginBottom: 8 }}>Recent runs</h4>
-            {!agents?.recent_runs?.length ? (
+            {!agents ? (
+              <p className="muted">Loading recent runs…</p>
+            ) : !countsAvailable || agents.recent_runs == null ? (
+              <p className="muted">Unavailable — operator read timed out. Empty is not proof the queue is empty.</p>
+            ) : !agents.recent_runs.length ? (
               <p className="muted">No agent runs yet.</p>
             ) : (
               agents.recent_runs.slice(0, 6).map((r: any) => (

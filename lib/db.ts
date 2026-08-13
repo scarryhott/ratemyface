@@ -20,6 +20,17 @@ export const APPEARANCE_ACTION_TIMEOUT_MS = 12_000;
 export const HEARTBEAT_DB_TIMEOUT_MS = 8_000;
 /** Social provider connect/disconnect/callback DB budget (far below 300s). */
 export const PROVIDER_OAUTH_TIMEOUT_MS = 12_000;
+/** Operator worker DB budget (claim / schema / reads). Must stay ≤ 20s. */
+export const OPERATOR_WORKER_DB_TIMEOUT_MS = 20_000;
+/** Operator schema DDL budget — never unbounded on a serverless hot path. */
+export const OPERATOR_SCHEMA_TIMEOUT_MS = 8_000;
+/**
+ * Hard wall for GET/POST /api/operator/run. Must abort well under maxDuration=60
+ * and never sit until the 300s platform limit.
+ */
+export const OPERATOR_WORKER_TIMEOUT_MS = 45_000;
+/** Dashboard / agents / ops read budget — JSON before the page can 504. */
+export const OPERATOR_READ_TIMEOUT_MS = 12_000;
 
 export class DatabaseTimeoutError extends Error {
   readonly timeoutMs: number;
@@ -27,6 +38,16 @@ export class DatabaseTimeoutError extends Error {
   constructor(timeoutMs: number, detail = "database_timeout") {
     super(`${detail}_${timeoutMs}ms`);
     this.name = "DatabaseTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+export class WorkerTimeoutError extends Error {
+  readonly timeoutMs: number;
+  readonly code = "WORKER_TIMEOUT";
+  constructor(timeoutMs: number, detail = "worker_timeout") {
+    super(`${detail}_${timeoutMs}ms`);
+    this.name = "WorkerTimeoutError";
     this.timeoutMs = timeoutMs;
   }
 }
@@ -70,12 +91,21 @@ export function runOncePerDbClient(slot: SchemaOnceSlot, fn: () => Promise<void>
   return pending;
 }
 
+export function isWorkerTimeoutError(error: unknown): boolean {
+  if (error instanceof WorkerTimeoutError) return true;
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: string; name?: string };
+  return e.code === "WORKER_TIMEOUT" || e.name === "WorkerTimeoutError";
+}
+
 export function isDatabaseTimeoutError(error: unknown): boolean {
+  if (isWorkerTimeoutError(error)) return false;
   if (error instanceof DatabaseTimeoutError) return true;
   if (!error || typeof error !== "object") {
     return typeof error === "string" && /timeout|timed out/i.test(error);
   }
-  const e = error as { code?: string; message?: string; errno?: string };
+  const e = error as { code?: string; message?: string; errno?: string; name?: string };
+  if (e.code === "WORKER_TIMEOUT" || e.name === "WorkerTimeoutError") return false;
   if (
     e.code === "DATABASE_TIMEOUT" ||
     e.code === "CONNECT_TIMEOUT" ||
@@ -172,6 +202,32 @@ export async function withDatabaseTimeout<T>(
     timer = setTimeout(() => {
       resetDbClient("timeout");
       reject(new DatabaseTimeoutError(budget));
+    }, budget);
+  });
+  try {
+    return await Promise.race([running, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Bound the whole operator worker (DB + GitHub + managerial loop) so Vercel
+ * never kills the invocation with FUNCTION_INVOCATION_TIMEOUT. Cap is 55s so
+ * a mistaken 300_000ms budget still returns JSON under maxDuration=60.
+ */
+export async function withWorkerTimeout<T>(
+  work: () => Promise<T>,
+  ms: number = OPERATOR_WORKER_TIMEOUT_MS
+): Promise<T> {
+  const budget = Math.max(20, Math.min(Math.trunc(ms), 55_000));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const running = Promise.resolve().then(work);
+  void running.catch(() => undefined);
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      resetDbClient("worker_timeout");
+      reject(new WorkerTimeoutError(budget));
     }, budget);
   });
   try {

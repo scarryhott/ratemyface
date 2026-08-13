@@ -4,7 +4,8 @@ import { databaseConfigured, db } from "./db";
 import { metric, unavailable, type MetricValue } from "./metricValue";
 import {
   getOperatorOpsRead,
-  infrastructureCreditBoundary
+  infrastructureCreditBoundary,
+  unavailableOperatorOpsRead
 } from "./operatorOpsRead";
 import { SOCIAL_PROVIDER_OAUTH } from "./providerConnections";
 import {
@@ -40,6 +41,8 @@ export type DashboardV2 = {
   ok: boolean;
   version: "dashboard_v2";
   database_configured: boolean;
+  counts_available?: boolean;
+  ops_read_error?: string;
   generated_at: string;
   actor?: string;
   owner?: unknown;
@@ -217,53 +220,58 @@ export type DashboardV2 = {
   ops: Awaited<ReturnType<typeof getOperatorOpsRead>>;
 };
 
-function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): DashboardV2 {
+function emptyDashboard(
+  ops: Awaited<ReturnType<typeof getOperatorOpsRead>>,
+  reason = "Database not configured"
+): DashboardV2 {
   const infra = infrastructureCreditBoundary();
   return {
     ok: true,
     version: "dashboard_v2",
     database_configured: false,
+    counts_available: false,
+    ops_read_error: reason,
     generated_at: new Date().toISOString(),
     business_overview: {
       users: {
-        total: unavailable("Database not configured"),
-        active_7d: unavailable("Database not configured"),
-        active_30d: unavailable("Database not configured"),
-        new_signups_7d: unavailable("Database not configured"),
-        new_signups_30d: unavailable("Database not configured")
+        total: unavailable(reason),
+        active_7d: unavailable(reason),
+        active_30d: unavailable(reason),
+        new_signups_7d: unavailable(reason),
+        new_signups_30d: unavailable(reason)
       },
       gpt_usage: {
-        inventory: unavailable("Database not configured"),
-        public_gpts: unavailable("Database not configured"),
+        inventory: unavailable(reason),
+        public_gpts: unavailable(reason),
         rate_my_face_chats: unavailable("ChatGPT usage stats are not ingested; provide export/screenshot to wire."),
-        action_calls: unavailable("Database not configured")
+        action_calls: unavailable(reason)
       },
       revenue: {
         amazon_clicks: unavailable("No Amazon Associates snapshot stored"),
         amazon_revenue_usd: unavailable("No Amazon Associates snapshot stored"),
         stripe_revenue_usd: unavailable("Stripe USD revenue not stored in Postgres yet"),
-        credits_sold: unavailable("Database not configured"),
-        credits_consumed: unavailable("Database not configured")
+        credits_sold: unavailable(reason),
+        credits_consumed: unavailable(reason)
       },
       learning: {
-        profiles_created: unavailable("Database not configured"),
-        interactions_stored: unavailable("Database not configured"),
-        recommendations_stored: unavailable("Database not configured"),
+        profiles_created: unavailable(reason),
+        interactions_stored: unavailable(reason),
+        recommendations_stored: unavailable(reason),
         compare_jobs: metric(0, "Paid Compare Action — no live jobs (vision limited)"),
-        social_connections: unavailable("Database not configured")
+        social_connections: unavailable(reason)
       }
     },
     credit_economy: {
       product_label: infra.product_credits.label,
       vercel_note: "Vercel Hobby / AI Gateway USD are hosting infrastructure — not product credits.",
-      founder_grants: unavailable("Database not configured"),
-      founder_grant_credits: unavailable("Database not configured"),
-      signup_grants: unavailable("Database not configured"),
-      stripe_packs_sold: unavailable("Database not configured"),
-      stripe_pack_credits: unavailable("Database not configured"),
-      stripe_events: unavailable("Database not configured"),
-      usage_consumed: unavailable("Database not configured"),
-      remaining_balance: unavailable("Database not configured"),
+      founder_grants: unavailable(reason),
+      founder_grant_credits: unavailable(reason),
+      signup_grants: unavailable(reason),
+      stripe_packs_sold: unavailable(reason),
+      stripe_pack_credits: unavailable(reason),
+      stripe_events: unavailable(reason),
+      usage_consumed: unavailable(reason),
+      remaining_balance: unavailable(reason),
       top_ops: [],
       recent_ledger: [],
       tables: ["rmf_credit_accounts", "rmf_credit_ledger", "rmf_entitlements"],
@@ -281,10 +289,10 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       tables: ["rmf_agent_gpts", "rmf_agent_runs", "rmf_agent_signals"]
     },
     learning_console: {
-      users_with_profiles: unavailable("Database not configured"),
+      users_with_profiles: unavailable(reason),
       observations: unavailable("learning_events table not shipped yet"),
-      recommendations: unavailable("Database not configured"),
-      interactions: unavailable("Database not configured"),
+      recommendations: unavailable(reason),
+      interactions: unavailable(reason),
       learning_events: unavailable("learning_events table not shipped yet"),
       recent_profiles: [],
       tables: [
@@ -333,9 +341,9 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
       planned: [...SOCIAL_PROVIDER_OAUTH.providers],
       configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers,
-      connection_rows: unavailable("Database not configured"),
-      connected: unavailable("Database not configured"),
-      revoked: unavailable("Database not configured"),
+      connection_rows: unavailable(reason),
+      connected: unavailable(reason),
+      revoked: unavailable(reason),
       gate: SOCIAL_PROVIDER_OAUTH.gate,
       table: SOCIAL_PROVIDER_OAUTH.table,
       schema_ready: false,
@@ -348,10 +356,10 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       amazon_ordered_items: unavailable("No Amazon Associates snapshot stored"),
       amazon_earnings_usd: unavailable("No Amazon Associates snapshot stored"),
       stripe_products: `Credit packs of ${creditsPerPack()} (Stripe RMF product credits)`,
-      stripe_purchases: unavailable("Database not configured"),
+      stripe_purchases: unavailable(reason),
       stripe_refunds: unavailable("Stripe refunds not mirrored into Postgres yet"),
-      stripe_usage_events: unavailable("Database not configured"),
-      stripe_events_processed: unavailable("Database not configured"),
+      stripe_usage_events: unavailable(reason),
+      stripe_events_processed: unavailable(reason),
       tables: ["rmf_stripe_events", "rmf_credit_ledger"],
       product_vs_infra: infra.product_credits.note
     },
@@ -377,12 +385,31 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       },
       latest_deploy_sha: deploySha() ? deploySha()!.slice(0, 12) : null,
       recent_errors: [],
-      failed_actions: unavailable("Database not configured"),
+      failed_actions: unavailable(reason),
       auth_failures: unavailable("Auth failure telemetry not persisted yet"),
       pending_approvals: 0
     },
     ops
   };
+}
+
+/** JSON-safe dashboard when the operator read times out — metrics are UNAVAILABLE, not fake zeros. */
+export function getUnavailableOperatorDashboard(reason = "database_timeout"): DashboardV2 {
+  const ops = unavailableOperatorOpsRead(reason);
+  const note =
+    reason === "database_timeout"
+      ? "Postgres did not respond in time. Counts are UNAVAILABLE — not zero."
+      : String(reason);
+  const base = emptyDashboard(ops, note);
+  base.ops = ops;
+  base.database_configured = databaseConfigured();
+  base.counts_available = false;
+  base.ops_read_error = reason;
+  base.operations_health.supabase = {
+    status: "unavailable",
+    note
+  };
+  return base;
 }
 
 export async function getOperatorDashboardV2(): Promise<DashboardV2> {
@@ -689,6 +716,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       ok: true,
       version: "dashboard_v2" as const,
       database_configured: true,
+      counts_available: true,
       generated_at: new Date().toISOString(),
       business_overview: {
         users: {
