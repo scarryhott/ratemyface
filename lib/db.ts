@@ -1,7 +1,29 @@
+import net from "node:net";
 import postgres from "postgres";
 
 let sqlClient: ReturnType<typeof postgres> | null = null;
-let schemaReady: Promise<void> | null = null;
+let clientGeneration = 0;
+const memorySchemaSlot: SchemaOnceSlot = { promise: null, gen: -1 };
+
+/** Client-side backstop. postgres.js `connect_timeout` is not a real TCP/TLS deadline. */
+export const DB_CONNECT_TIMEOUT_SECONDS = 5;
+export const DB_STATEMENT_TIMEOUT_MS = 8000;
+export const DB_LOCK_TIMEOUT_MS = 3000;
+/** Whole serverless DB operation budget (compare POST, operator agents, tests). */
+export const DB_OPERATION_TIMEOUT_MS = 12_000;
+export const COMPARE_TEST_DB_TIMEOUT_MS = 12_000;
+
+export class DatabaseTimeoutError extends Error {
+  readonly timeoutMs: number;
+  readonly code = "DATABASE_TIMEOUT";
+  constructor(timeoutMs: number, detail = "database_timeout") {
+    super(`${detail}_${timeoutMs}ms`);
+    this.name = "DatabaseTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+export type SchemaOnceSlot = { promise: Promise<void> | null; gen: number };
 
 function connectionString(): string | null {
   // Vercel functions should use Supabase's IPv4-compatible Supavisor pooler.
@@ -13,6 +35,97 @@ export function databaseConfigured(): boolean {
   return Boolean(connectionString());
 }
 
+export function dbClientGeneration(): number {
+  return clientGeneration;
+}
+
+export function newSchemaSlot(): SchemaOnceSlot {
+  return { promise: null, gen: -1 };
+}
+
+/**
+ * Cache schema DDL per live client. A hung first attempt must not pin a
+ * forever-pending promise after resetDbClient() (warm isolate reuse).
+ */
+export function runOncePerDbClient(slot: SchemaOnceSlot, fn: () => Promise<void>): Promise<void> {
+  const gen = clientGeneration;
+  if (slot.promise && slot.gen === gen) return slot.promise;
+  slot.gen = gen;
+  const pending = fn().catch((error) => {
+    if (slot.gen === gen) {
+      slot.promise = null;
+      slot.gen = -1;
+    }
+    throw error;
+  });
+  slot.promise = pending;
+  return pending;
+}
+
+export function isDatabaseTimeoutError(error: unknown): boolean {
+  if (error instanceof DatabaseTimeoutError) return true;
+  if (!error || typeof error !== "object") {
+    return typeof error === "string" && /timeout|timed out/i.test(error);
+  }
+  const e = error as { code?: string; message?: string; errno?: string };
+  if (
+    e.code === "DATABASE_TIMEOUT" ||
+    e.code === "CONNECT_TIMEOUT" ||
+    e.code === "ETIMEDOUT" ||
+    e.code === "57014" ||
+    e.code === "55P03"
+  ) {
+    return true;
+  }
+  return /timeout|timed out|CONNECT_TIMEOUT|db_connect_timeout|statement timeout|lock timeout/i.test(
+    String(e.message || "")
+  );
+}
+
+export function isUndefinedTableError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "42P01");
+}
+
+/**
+ * Force IPv4 (Supabase pooler on Vercel) and a real TCP connect deadline.
+ * postgres.js `connect_timeout` uses socket idle timeout and does not abort a
+ * hanging SYN. TLS/pooler waits after TCP are bounded by withDatabaseTimeout.
+ */
+function createDbSocket(params: { host?: string | string[]; port?: number | number[] | string }): net.Socket {
+  const host = String(Array.isArray(params.host) ? params.host[0] : params.host || "localhost");
+  const port = Number(Array.isArray(params.port) ? params.port[0] : params.port || 5432);
+  const ip6Literal = host.includes(":");
+  const socket = net.connect({
+    host,
+    port,
+    ...(ip6Literal ? {} : { family: 4 })
+  }) as net.Socket & { host?: string; port?: number };
+  socket.host = host;
+  socket.port = port;
+  const ms = DB_CONNECT_TIMEOUT_SECONDS * 1000;
+  const timer = setTimeout(() => {
+    socket.destroy(
+      Object.assign(new Error(`db_connect_timeout_${ms}ms`), { code: "CONNECT_TIMEOUT" })
+    );
+  }, ms);
+  const clear = () => clearTimeout(timer);
+  socket.once("connect", clear);
+  socket.once("error", clear);
+  socket.once("close", clear);
+  return socket;
+}
+
+export function resetDbClient(_reason = "reset"): void {
+  clientGeneration += 1;
+  const client = sqlClient;
+  sqlClient = null;
+  memorySchemaSlot.promise = null;
+  memorySchemaSlot.gen = -1;
+  if (client) {
+    void client.end({ timeout: 1 }).catch(() => undefined);
+  }
+}
+
 export function db() {
   if (sqlClient) return sqlClient;
   const url = connectionString();
@@ -21,16 +134,47 @@ export function db() {
     max: 1,
     ssl: "require",
     prepare: false,
+    fetch_types: false,
     idle_timeout: 20,
-    connect_timeout: 10,
-    max_lifetime: 60
-  });
+    connect_timeout: DB_CONNECT_TIMEOUT_SECONDS,
+    max_lifetime: 60,
+    connection: {
+      statement_timeout: DB_STATEMENT_TIMEOUT_MS,
+      lock_timeout: DB_LOCK_TIMEOUT_MS,
+      idle_in_transaction_session_timeout: DB_STATEMENT_TIMEOUT_MS
+    },
+    socket: createDbSocket
+  } as Parameters<typeof postgres>[1]);
   return sqlClient;
 }
 
+/**
+ * Bound any DB work so a hung postgres.js socket cannot sit until the 300s
+ * Vercel limit. On timeout, drop the max:1 client so the isolate is not wedged.
+ */
+export async function withDatabaseTimeout<T>(
+  work: () => Promise<T>,
+  ms: number = DB_OPERATION_TIMEOUT_MS
+): Promise<T> {
+  const budget = Math.max(20, Math.min(Math.trunc(ms), 25_000));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const running = Promise.resolve().then(work);
+  void running.catch(() => undefined);
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      resetDbClient("timeout");
+      reject(new DatabaseTimeoutError(budget));
+    }, budget);
+  });
+  try {
+    return await Promise.race([running, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function ensureMemorySchema(): Promise<void> {
-  if (schemaReady) return schemaReady;
-  schemaReady = (async () => {
+  return runOncePerDbClient(memorySchemaSlot, async () => {
     const sql = db();
     await sql`
       create table if not exists rmf_users (
@@ -70,6 +214,5 @@ export async function ensureMemorySchema(): Promise<void> {
     `;
     await sql`create index if not exists rmf_conversation_summaries_user_created_idx on rmf_conversation_summaries(user_id, created_at desc)`;
     await sql`create index if not exists rmf_recommendations_user_created_idx on rmf_recommendations(user_id, created_at desc)`;
-  })();
-  return schemaReady;
+  });
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { db } from "./db";
+import { db, newSchemaSlot, runOncePerDbClient } from "./db";
 import {
   recordStrategyFromRun,
   type BusinessMetricsSnapshot
@@ -18,7 +18,7 @@ import {
   type OperatorToolReceipt
 } from "./operatorTools";
 
-let ready: Promise<void> | null = null;
+const schemaSlot = newSchemaSlot();
 export type { Authority } from "./operatorTools";
 
 function clampAuthority(value: unknown, fallback: Authority = 1): Authority {
@@ -37,8 +37,7 @@ function errorMessage(error: unknown): string {
 }
 
 export async function ensureOperatorSchema(): Promise<void> {
-  if (ready) return ready;
-  ready = (async () => {
+  return runOncePerDbClient(schemaSlot, async () => {
     const sql = db();
     await sql`
       create table if not exists rmf_agent_signals(
@@ -161,8 +160,7 @@ export async function ensureOperatorSchema(): Promise<void> {
         vercel_project_id=coalesce(excluded.vercel_project_id,rmf_agent_projects.vercel_project_id),
         updated_at=now()
     `;
-  })();
-  return ready;
+  });
 }
 
 export async function enqueueSignal(

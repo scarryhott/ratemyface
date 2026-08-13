@@ -1,16 +1,15 @@
-import { db, databaseConfigured } from "./db";
+import { db, databaseConfigured, newSchemaSlot, runOncePerDbClient } from "./db";
 import {
   PLANNED_SOCIAL_PROVIDERS,
   SOCIAL_PROVIDER_OAUTH,
   type PlannedSocialProvider
 } from "./providerConnections";
 
-let ready: Promise<void> | null = null;
+const schemaSlot = newSchemaSlot();
 
 /** Ensure OAuth-ready provider_connections columns exist (runtime mirror of migration). */
 export async function ensureProviderConnectionsSchema() {
-  if (ready) return ready;
-  ready = (async () => {
+  return runOncePerDbClient(schemaSlot, async () => {
     if (!databaseConfigured()) return;
     const sql = db();
     await sql`
@@ -35,8 +34,7 @@ export async function ensureProviderConnectionsSchema() {
     await sql`alter table rmf_provider_connections add column if not exists revoked_at timestamptz`;
     await sql`create index if not exists rmf_provider_connections_status_idx on rmf_provider_connections(status, updated_at desc)`;
     await sql`create index if not exists rmf_provider_connections_provider_idx on rmf_provider_connections(provider, status)`;
-  })();
-  return ready;
+  });
 }
 
 export type ProviderConnectionPublic = {
