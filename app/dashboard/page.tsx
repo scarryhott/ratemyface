@@ -92,20 +92,22 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section aria-labelledby="planned-features-title">
-        <div className="featureSectionHeading">
-          <div>
-            <p className="featureDashboardEyebrow">Next closure</p>
-            <h2 id="planned-features-title">Planned</h2>
+      {planned.length > 0 ? (
+        <section aria-labelledby="planned-features-title">
+          <div className="featureSectionHeading">
+            <div>
+              <p className="featureDashboardEyebrow">Next closure</p>
+              <h2 id="planned-features-title">Planned</h2>
+            </div>
+            <p>Not claimed as implemented.</p>
           </div>
-          <p>Not claimed as implemented.</p>
-        </div>
-        <div className="featureStatusGrid featureStatusGrid--planned">
-          {planned.map((feature) => (
-            <FeatureCard feature={feature} key={feature.name} />
-          ))}
-        </div>
-      </section>
+          <div className="featureStatusGrid featureStatusGrid--planned">
+            {planned.map((feature) => (
+              <FeatureCard feature={feature} key={feature.name} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

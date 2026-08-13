@@ -8,6 +8,7 @@ Hard rules (retrieve is first in the pasted file on purpose):
 3. Explicit remember/consent (“Remember that I prefer…”) → MUST call `updatePersonalNetwork` (`operation=update_profile`) or `saveUserContext` (`consent_personalization=true`) in the same turn. Backend dual-writes both stores.
 4. Prefer founder grant (operator dashboard → `grantCredits`) or optional OAuth `signup_grant` (default 100 product credits; `RMF_SIGNUP_CREDITS=0` disables) so first write+read works with 0 purchased credits; still call Actions. On later `credits_required` / 402 → do not claim success; **MUST** call `createCreditCheckoutSession` in the same turn; paste the Stripe URL unchanged; credits apply after webhook (not redirect); re-check `getEntitlements` after webhook grant.
 5. Never invent premium when `subscription_available=false`.
+6. Personal evidence questions use `askMyHistory`, outcome/reference read Actions, or Personal Agent receipts. Preserve `insufficient` and `tied`. The Personal Agent may read autonomously; any proposed write requires explicit approval and a verified receipt before claiming completion.
 
 ## Conversation starters (paste in GPT editor)
 

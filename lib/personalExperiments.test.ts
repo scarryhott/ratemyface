@@ -59,6 +59,11 @@ describe("Personal Experiments product wiring", () => {
     assert.match(instructions, /getPersonalExperiments/);
     assert.match(instructions, /Preserve `insufficient` and `tied` as non-directional states/);
     assert.match(instructions, /never causal, population, or medical proof/);
+    assert.match(instructions, /askMyHistory/);
+    assert.match(instructions, /recordProductOutcome/);
+    assert.match(instructions, /recordSocialOutcome/);
+    assert.match(instructions, /updateReferenceComparison/);
+    assert.match(instructions, /verified own-row `evidence_ref`/);
     assert.ok(instructions.length <= 7900, `GPT_INSTRUCTIONS.md is ${instructions.length} chars`);
   });
 });

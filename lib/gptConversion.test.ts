@@ -1,5 +1,5 @@
 /**
- * Conversion contracts: same-turn credit checkout, OpenAPI 2.6.0, conversation starters.
+ * Conversion contracts: same-turn credit checkout, OpenAPI 3.0.0, conversation starters.
  * Run: node --experimental-strip-types --test lib/gptConversion.test.ts
  */
 import assert from "node:assert/strict";
@@ -73,13 +73,13 @@ describe("conversation starters in paste lists", () => {
   });
 });
 
-describe("OpenAPI 2.6.0 conversion descriptions", () => {
+describe("OpenAPI 3.0.0 conversion descriptions", () => {
   const openapi = read("app/api/openapi/route.ts");
   const health = read("app/api/health/route.ts");
 
-  it("bumps schema version to 2.6.0", () => {
-    assert.match(openapi, /version:\s*"2\.6\.0"/);
-    assert.match(health, /openapi_version:\s*"2\.6\.0"/);
+  it("bumps schema version to 3.0.0", () => {
+    assert.match(openapi, /version:\s*"3\.0\.0"/);
+    assert.match(health, /openapi_version:\s*"3\.0\.0"/);
     assert.equal(openapi.includes("2.5.6"), false);
     assert.equal(openapi.includes("2.5.5"), false);
   });

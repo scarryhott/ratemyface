@@ -8,7 +8,7 @@ Minimal Next.js backend for the Rate My Face Custom GPT.
 
 The backend never invents ASINs.
 
-- When Amazon Creators API is configured and returns a valid product, the backend returns Amazon's own vended `detailPageURL` containing `ratemyface0a-20`.
+- When Amazon Creators API is configured and returns a valid product, the backend returns Amazon's own vended `detailPageURL` containing `ratemyfacegpt-20`.
 - When Creators API is unavailable or not yet configured, the backend returns a tagged Amazon search-results link instead of fabricating a product ASIN.
 
 ## Endpoints
@@ -27,6 +27,12 @@ The backend never invents ASINs.
 - `GET|POST /api/appearance` — paid **appearancePlan** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_appearance=true` + Account Learning and Compare history. Unauthenticated callers get `401 oauth_required`. Missing history returns 400 rather than invented coaching.
 - `GET|POST /api/appearance/plans` — paid **appearanceCheckin** OpenAPI Action on POST (same 1-credit unit). GET lists the caller’s plans (OAuth). Unauthenticated callers get `401`.
 - `GET|POST /api/experiments` — paid **getPersonalExperiments** / **updatePersonalExperiment** Actions. A user defines two distinct options (for example, short beard vs clean-shaven), records 1–5 outcomes for either option, and receives an explicit `insufficient`, `tied`, `favors_a`, or `favors_b` evidence state. Directional results are provisional personal evidence, not causal or medical claims.
+- `POST /api/history/ask` — paid **askMyHistory** Action. Retrieves answers from the caller's own stored interactions, recommendations, experiments, outcomes, references, and verified agent receipts; returns `insufficient` instead of guessing.
+- `GET|POST /api/products/outcomes` — paid **getProductLearning** / **recordProductOutcome** Actions. Links consented 1–5 outcomes to saved product recommendations and requires two observations per product before a product relation closes.
+- `GET|POST /api/social/outcomes` — paid **getSocialOutcomeIntelligence** / **recordSocialOutcome** Actions. Accepts manual or OAuth-provider-authorized metrics only, never scraping, with four observations per provider/metric relation before direction.
+- `GET|POST /api/references` — paid **getReferenceComparisons** / **updateReferenceComparison** Actions. Tracks paired self/reference scores with explicit insufficient, tied, or directional closure and no identity, worth, or causal claim.
+- `GET|POST /api/personal-agent` — paid **getPersonalAgentRuns** / **updatePersonalAgent** Actions. The bounded agent performs autonomous history reads, proposes the smallest next evidence step, requires explicit approval for writes, and closes only against a verified own-row evidence receipt.
+- `GET|POST|DELETE /api/mcp` — MCP surface. The Personal Network expansion adds five read-only tools scoped to `RMF_CHATGPT_MCP_USER_ID`; it does not expose personal mutation tools.
 
 ## Social providers (user-authorized OAuth)
 
@@ -42,6 +48,11 @@ Set for Production:
 
 - `GPT_ACTION_SECRET` — a long random value used as the GPT Action bearer API key.
 
+Optional MCP personal-data scope (required only to enable the five read-only personal MCP tools):
+
+- `RMF_CHATGPT_MCP_TOKEN` — bearer token for the MCP transport.
+- `RMF_CHATGPT_MCP_USER_ID` — the one OAuth user id whose personal reads the server may expose. The MCP tools do not accept arbitrary user ids.
+
 Optional, for exact product resolution through Amazon Creators API:
 
 - `AMAZON_CREATORS_CLIENT_ID`
@@ -51,7 +62,7 @@ Do not prefix any secret with `NEXT_PUBLIC_`.
 
 ## Amazon integration
 
-This implementation targets the US marketplace (`www.amazon.com`) and Associates tag `ratemyface0a-20`.
+This implementation targets the US marketplace (`www.amazon.com`) and Associates tag `ratemyfacegpt-20`.
 
 With Creators API credentials it uses:
 

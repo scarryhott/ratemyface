@@ -32,14 +32,14 @@ describe("public feature dashboard", () => {
     assert.equal(names.size, dashboard.features.length);
     assert.equal(dashboard.features.filter((feature) => feature.status === "LIVE").length, 2);
     assert.equal(dashboard.features.filter((feature) => feature.status === "PAID").length, 2);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "READY").length, 2);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "READY").length, 8);
     assert.equal(dashboard.features.filter((feature) => feature.status === "NOT CONFIGURED").length, 1);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "PLANNED").length, 6);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "PLANNED").length, 0);
   });
 
   it("uses verified database snapshot values for vital stats", () => {
     const stats = Object.fromEntries(dashboard.vital_stats.map((stat) => [stat.label, stat.value]));
-    assert.equal(stats["Available or ready"], 6);
+    assert.equal(stats["Available or ready"], 12);
     assert.equal(stats["Account users"], 1);
     assert.equal(stats["Saved history"], 4);
     assert.equal(stats["Credit balance"], 92);
@@ -53,5 +53,18 @@ describe("public feature dashboard", () => {
     assert.equal(whatWorks?.status, "READY");
     assert.equal(experiments?.status, "READY");
     assert.ok(experiments?.stats.includes("2 outcomes per option"));
+  });
+
+  it("shows all six personal intelligence features as ready, not planned", () => {
+    for (const name of [
+      "Ask My History",
+      "Outcome-aware Product Learning",
+      "Social Outcome Intelligence",
+      "Reference Comparison",
+      "Personal Network / MCP Expansion",
+      "Autonomous Personal Agent"
+    ]) {
+      assert.equal(dashboard.features.find((feature) => feature.name === name)?.status, "READY");
+    }
   });
 });

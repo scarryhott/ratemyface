@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-08-13T20:26:05Z",
+  "updated_at": "2026-08-13T21:10:00Z",
   "vital_stats": [
     {
       "label": "Available or ready",
-      "value": 6,
-      "note": "2 live · 2 paid · 2 ready"
+      "value": 12,
+      "note": "2 live · 2 paid · 8 ready"
     },
     {
       "label": "Account users",
@@ -84,45 +84,45 @@
     },
     {
       "name": "Ask My History",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Answer questions directly from the user's own saved interaction and outcome history.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Answers from the user's own saved evidence and returns insufficient when no stored record matches.",
+      "stats": ["1 credit", "7 evidence sources", "No web guessing"]
     },
     {
       "name": "Outcome-aware Product Learning",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Learn which recommended products actually worked for the individual instead of relying on stated preference alone.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Learns from recorded outcomes on saved products while keeping sparse and tied evidence explicit.",
+      "stats": ["1 credit", "2 outcomes minimum", "1–5 personal score"]
     },
     {
       "name": "Social Outcome Intelligence",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Relate authorized social evidence to personal outcomes without scraping or unsupported inference.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Relates user-recorded or provider-authorized metric trends without scraping or causal inference.",
+      "stats": ["1 credit", "4 observations minimum", "Scraping off"]
     },
     {
       "name": "Reference Comparison",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Compare the user's own evidence with a chosen reference while keeping identity and causality claims bounded.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Compares paired scores with a distinct chosen reference while bounding identity, worth, and causality claims.",
+      "stats": ["1 credit", "2 paired observations", "No identity claim"]
     },
     {
       "name": "Personal Network / MCP Expansion",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Expose more of the personal evidence network through bounded, consented tools.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Exposes five bounded read tools for a single server-scoped user; personal writes remain OAuth-only.",
+      "stats": ["5 MCP reads", "Single-user scope", "0 MCP writes"]
     },
     {
       "name": "Autonomous Personal Agent",
-      "status": "PLANNED",
-      "tone": "planned",
-      "summary": "Act on personal evidence over time with explicit authority, receipts, and closure checks.",
-      "stats": ["Not built"]
+      "status": "READY",
+      "tone": "ready",
+      "summary": "Autonomously reads evidence and proposes the smallest next step; writes require approval and verified receipts.",
+      "stats": ["Authority 0 reads", "Approval-gated writes", "Verified receipts"]
     }
   ],
   "summary": {
@@ -184,6 +184,15 @@
     "appearanceCheckin": "PAID",
     "getPersonalExperiments": "PAID",
     "updatePersonalExperiment": "PAID",
+    "askMyHistory": "PAID",
+    "getProductLearning": "PAID",
+    "recordProductOutcome": "PAID",
+    "getSocialOutcomeIntelligence": "PAID",
+    "recordSocialOutcome": "PAID",
+    "getReferenceComparisons": "PAID",
+    "updateReferenceComparison": "PAID",
+    "getPersonalAgentRuns": "PAID",
+    "updatePersonalAgent": "PAID",
     "deleteUserContext": "ACCOUNT/SECURITY"
   },
   "quality_review": {
