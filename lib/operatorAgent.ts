@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { db, newSchemaSlot, runOncePerDbClient } from "./db";
+import { db, DB_OPERATION_TIMEOUT_MS, newSchemaSlot, runOncePerDbClient, withDatabaseTimeout } from "./db";
+import { planQueueMaintenance, SIGNAL_MAX_ATTEMPTS, type QueueSignal } from "./operatorQueue";
 import {
   classifyCycle,
   decideManagerialAction,
@@ -58,11 +59,15 @@ export async function ensureOperatorSchema(): Promise<void> {
         payload jsonb not null default '{}'::jsonb,
         status text not null default 'queued',
         requested_authority int not null default 1,
+        attempt_count int not null default 0,
+        fail_reason text,
         created_at timestamptz not null default now(),
         started_at timestamptz,
         completed_at timestamptz
       )
     `;
+    await sql`alter table rmf_agent_signals add column if not exists attempt_count int not null default 0`;
+    await sql`alter table rmf_agent_signals add column if not exists fail_reason text`;
     await sql`
       create table if not exists rmf_agent_runs(
         id bigserial primary key,
@@ -261,36 +266,92 @@ export async function enqueueSignalIdempotent(
   return { ...result[0], duplicate: false, idempotency_key: key };
 }
 
+function asQueueSignal(row: Record<string, unknown>): QueueSignal {
+  return {
+    id: Number(row.id),
+    kind: String(row.kind || ""),
+    status: String(row.status || ""),
+    attempt_count: Number(row.attempt_count || 0),
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at || ""),
+    started_at:
+      row.started_at == null
+        ? null
+        : row.started_at instanceof Date
+          ? row.started_at.toISOString()
+          : String(row.started_at),
+    total_runs: Number(row.total_runs || 0),
+    stale_timeout_runs: Number(row.stale_timeout_runs || 0)
+  };
+}
+
+/**
+ * Claim the next signal after bounded stale recovery.
+ * Stale running runs are failed and kept. The same signal is not blindly requeued.
+ * Legacy leftover queue items are closed (not deleted) so a current business_improve can run.
+ */
 export async function nextSignal() {
-  await ensureOperatorSchema();
-  const sql = db();
+  return withDatabaseTimeout(async () => {
+    await ensureOperatorSchema();
+    const sql = db();
 
-  // A Vercel function can be terminated by the platform before our catch block runs.
-  // Recover only runs that have exceeded the route's execution window by a wide margin.
-  await sql`
-    update rmf_agent_runs
-    set status='failed',closure_state='stale_timeout',error=coalesce(error,'stale_run_recovered_after_timeout'),completed_at=now()
-    where status='running' and created_at < now() - interval '2 minutes'
-  `;
-  await sql`
-    update rmf_agent_signals
-    set status='queued',started_at=null
-    where status='running' and started_at < now() - interval '2 minutes'
-  `;
+    // Platform can kill a worker before the catch block. Fail the run row; do not
+    // recycle the parent signal unless the queue policy allows a bounded retry.
+    await sql`
+      update rmf_agent_runs
+      set status='failed',closure_state='stale_timeout',error=coalesce(error,'stale_run_recovered_after_timeout'),completed_at=now()
+      where status='running' and created_at < now() - interval '2 minutes'
+    `;
+    await sql`
+      update rmf_agent_signals s
+      set attempt_count = greatest(
+        coalesce(s.attempt_count, 0),
+        (select count(*)::int from rmf_agent_runs r where r.signal_id = s.id)
+      )
+      where s.status in ('queued', 'running')
+    `;
 
-  const result = await sql`
-    update rmf_agent_signals
-    set status='running',started_at=now()
-    where id=(
-      select id from rmf_agent_signals
-      where status='queued'
-      order by created_at
-      for update skip locked
-      limit 1
-    )
-    returning *
-  `;
-  return result[0] || null;
+    const open = await sql`
+      select
+        s.id, s.kind, s.status, s.attempt_count, s.created_at, s.started_at,
+        (select count(*)::int from rmf_agent_runs r where r.signal_id = s.id) as total_runs,
+        (
+          select count(*)::int from rmf_agent_runs r
+          where r.signal_id = s.id and r.closure_state = 'stale_timeout'
+        ) as stale_timeout_runs
+      from rmf_agent_signals s
+      where s.status in ('queued', 'running')
+      order by s.id
+    `;
+    const plan = planQueueMaintenance(open.map((row) => asQueueSignal(row as Record<string, unknown>)));
+
+    for (const item of plan.close) {
+      await sql`
+        update rmf_agent_signals
+        set status='failed',
+            completed_at=coalesce(completed_at, now()),
+            fail_reason=${item.reason}
+        where id=${item.id} and status in ('queued', 'running')
+      `;
+    }
+    for (const id of plan.requeue) {
+      await sql`
+        update rmf_agent_signals
+        set status='queued', started_at=null
+        where id=${id} and status='running'
+      `;
+    }
+    if (plan.claimId == null) return null;
+
+    const result = await sql`
+      update rmf_agent_signals
+      set status='running', started_at=now(), attempt_count=attempt_count + 1
+      where id=${plan.claimId}
+        and status='queued'
+        and attempt_count < ${SIGNAL_MAX_ATTEMPTS}
+      returning *
+    `;
+    return result[0] || null;
+  }, DB_OPERATION_TIMEOUT_MS);
 }
 
 async function safeGithubContext(): Promise<Record<string, unknown>> {
@@ -458,6 +519,8 @@ export async function runOneSignal() {
       : {};
   const metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
   const kind = String(signal.kind);
+  const signalId = Number(signal.id);
+  const signalSource = String(signal.source);
   const isBuildCycle = kind === "business_improve" || kind === "heartbeat";
   let managerial: ManagerialDecision | null = null;
   if (isBuildCycle) {
@@ -490,10 +553,10 @@ export async function runOneSignal() {
   ) {
     try {
       return await recordStrategyFromRun({
-        source: String(signal.source),
-        kind: String(signal.kind),
+        source: signalSource,
+        kind: kind,
         runId,
-        signalId: Number(signal.id),
+        signalId,
         status,
         closureState: closureState || null,
         plan,
