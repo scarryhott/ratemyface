@@ -148,8 +148,8 @@ export default function OperatorDashboardV2() {
           </p>
           <h1 style={{ margin: 0, fontSize: 36 }}>Rate My Face · Agent Console</h1>
           <p className="muted" style={{ maxWidth: 720 }}>
-            Chat with and manage the operator agent. Strategy impact reports land here after improve cycles. Business
-            metrics stay secondary below.
+            Heartbeats supervise the execution-bearing build loop. They do not ship features. The console shows the
+            specified backlog, last receipt, and blocked-on — not run counts as progress.
           </p>
         </div>
         <div
@@ -226,7 +226,7 @@ export default function OperatorDashboardV2() {
         <section className="card" style={{ marginTop: 16 }}>
           <h2 style={{ marginTop: 0 }}>Agent Console</h2>
           <p className="muted" style={{ marginBottom: 0 }}>
-            Sign in to chat with the operator, run improve cycles, approve work, and read strategy reports.
+            Sign in to dispatch the next unfinished feature, approve L2 work, and read backlog receipts.
           </p>
         </section>
       )}

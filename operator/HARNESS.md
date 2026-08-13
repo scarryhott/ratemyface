@@ -125,6 +125,18 @@ For each potential addition, planning should seek the smallest testable closure 
 
 Do not build a later-stage operational capability merely because it appears useful. First close the currently admitted layer.
 
+## Execution-bearing managerial loop
+
+Persistent business agents supervise a feature backlog (`operator/FEATURE_BACKLOG.json`): Account Learning, Compare Me To Me, Appearance Agent, Social OAuth. Status is derived from repo/production evidence (flags, OpenAPI, health, tables), not heartbeat or run counts.
+
+Intended cycle:
+
+`goal → inspect repo → select next unfinished feature → implement/dispatch → test → PR → verify production → receipt → next feature`
+
+`GET /api/operator/heartbeat` only enqueues an idempotent `business_improve` signal. `GET|POST /api/operator/run` is the worker. A heartbeat, strategy report, or observe-only tool is a failed/no-op cycle when unfinished work exists — not feature progress. The backlog advances only on a verified `feature_production_verify` receipt.
+
+L2 `github_implementation_dispatch` is the sanctioned write path for an unfinished item: isolated `agent/run-*-dispatch` branch, one dispatch artifact, optional draft PR, no merge. If `RMF_OPERATOR_MAX_AUTHORITY < 2` or `GITHUB_OPERATOR_TOKEN` is missing, the cycle records `blocked-on` approval or missing secret.
+
 ## Next admission after repeated successful probes
 
 After the GitHub L2 control probe is verified, documented, and reintegrated, the next candidate is an L2 sandbox/code-patch capability that writes only to an isolated branch, executes build/tests in a sandbox, and closes only if the independent verifier returns the expected result. L3 preview deployment follows only after that layer closes.

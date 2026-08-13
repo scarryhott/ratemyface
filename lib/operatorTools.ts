@@ -7,6 +7,8 @@ export type OperatorToolName =
   | "github_read"
   | "vercel_observe"
   | "github_branch_diagnostic"
+  | "github_implementation_dispatch"
+  | "feature_production_verify"
   | "browser_observe";
 
 export interface OperatorToolSpec { name: OperatorToolName; authority: Authority; mutating: boolean; reversible: boolean; description: string; }
@@ -18,6 +20,8 @@ const TOOL_SPECS: Record<OperatorToolName,OperatorToolSpec> = {
  github_read:{name:"github_read",authority:0,mutating:false,reversible:true,description:"Read the configured GitHub repository and current base commit."},
  vercel_observe:{name:"vercel_observe",authority:0,mutating:false,reversible:true,description:"Observe the active Vercel deployment identity and independently verify its public production surface is reachable."},
  github_branch_diagnostic:{name:"github_branch_diagnostic",authority:2,mutating:true,reversible:true,description:"Create an isolated agent/run-* branch, write one diagnostic receipt, read it back, and never merge it."},
+ github_implementation_dispatch:{name:"github_implementation_dispatch",authority:2,mutating:true,reversible:true,description:"Create an isolated agent/run-*-dispatch branch, write a feature-dispatch artifact with acceptance criteria, optionally open a draft PR, and never merge."},
+ feature_production_verify:{name:"feature_production_verify",authority:0,mutating:false,reversible:true,description:"Verify one backlog feature against production /api/health (flag + endpoint). Repo flags alone do not ship."},
  browser_observe:{name:"browser_observe",authority:2,mutating:false,reversible:true,description:"Authenticate to the Railway browser runtime, observe an allowlisted page twice independently, and close only when snapshot digests agree."}
 };
 function sha256(v:string){return createHash("sha256").update(v).digest("hex");} function digestJson(v:unknown){return sha256(JSON.stringify(v));}
@@ -25,11 +29,129 @@ function githubConfig(){const repository=process.env.RMF_OPERATOR_GITHUB_REPO||"
 interface GithubResponse{ok:boolean;status:number;data:any}
 async function githubRequest(path:string,init:RequestInit={},requireAuth=false):Promise<GithubResponse>{const cfg=githubConfig();if(requireAuth&&!cfg.token)throw new Error("GITHUB_OPERATOR_TOKEN_not_configured");const headers=new Headers(init.headers||{});headers.set("Accept","application/vnd.github+json");headers.set("X-GitHub-Api-Version","2026-03-10");headers.set("User-Agent","ratemyface-closure-operator");if(cfg.token)headers.set("Authorization",`Bearer ${cfg.token}`);if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");const response=await fetch(`https://api.github.com${path}`,{...init,headers,cache:"no-store"});const text=await response.text();let data:any=null;if(text){try{data=JSON.parse(text)}catch{data={text:text.slice(0,1000)}}}return{ok:response.ok,status:response.status,data};}
 function assertGithub(r:GithubResponse,op:string){if(!r.ok)throw new Error(`${op}_github_${r.status}:${String(r.data?.message||r.data?.text||"unknown_error").slice(0,500)}`);return r.data;} function encodePath(p:string){return p.split("/").map(encodeURIComponent).join("/");} function decodeGithubContent(d:any){return Buffer.from(String(d?.content||"").replace(/\n/g,""),"base64").toString("utf8");}
-export function getOperatorToolRegistry(){const cfg=githubConfig();const browserConfigured=Boolean(process.env.RMF_BROWSER_CONTROL_URL&&process.env.RMF_BROWSER_CONTROL_TOKEN);const vercelConfigured=Boolean(process.env.VERCEL_URL||process.env.VERCEL_PROJECT_PRODUCTION_URL);return Object.values(TOOL_SPECS).map(spec=>({...spec,configured:spec.name==="github_branch_diagnostic"?Boolean(cfg.token):spec.name==="browser_observe"?browserConfigured:spec.name==="vercel_observe"?vercelConfigured:true}));}
+export function getOperatorToolRegistry(){const cfg=githubConfig();const browserConfigured=Boolean(process.env.RMF_BROWSER_CONTROL_URL&&process.env.RMF_BROWSER_CONTROL_TOKEN);const vercelConfigured=Boolean(process.env.VERCEL_URL||process.env.VERCEL_PROJECT_PRODUCTION_URL);const githubWrite=Boolean(cfg.token);return Object.values(TOOL_SPECS).map(spec=>({...spec,configured:spec.name==="github_branch_diagnostic"||spec.name==="github_implementation_dispatch"?githubWrite:spec.name==="browser_observe"?browserConfigured:spec.name==="vercel_observe"?vercelConfigured:true}));}
 export function getOperatorToolSpec(name:string):OperatorToolSpec|null{return (TOOL_SPECS as Record<string,OperatorToolSpec>)[name]||null;}
 export async function projectContextRead():Promise<Record<string,unknown>>{const cfg=githubConfig();return{harness:"closure-native-v1",environment:process.env.VERCEL_ENV||process.env.NODE_ENV||"unknown",deployment:{url:process.env.VERCEL_URL||null,production_url:process.env.VERCEL_PROJECT_PRODUCTION_URL||null,deployment_id:process.env.VERCEL_DEPLOYMENT_ID||null,project_id:process.env.VERCEL_PROJECT_ID||null,git_commit_sha:process.env.VERCEL_GIT_COMMIT_SHA||null,git_commit_ref:process.env.VERCEL_GIT_COMMIT_REF||null},github:{repository:cfg.repository,base:cfg.base,write_configured:Boolean(cfg.token)},browser:{configured:Boolean(process.env.RMF_BROWSER_CONTROL_URL&&process.env.RMF_BROWSER_CONTROL_TOKEN),control_url:process.env.RMF_BROWSER_CONTROL_URL?new URL(process.env.RMF_BROWSER_CONTROL_URL).origin:null,allowed_target:"chatgpt.com"},max_authority:Number(process.env.RMF_OPERATOR_MAX_AUTHORITY||1),model:process.env.RMF_OPERATOR_MODEL||"openai/gpt-5.6-terra",tools:getOperatorToolRegistry()};}
 export async function vercelObserve():Promise<Record<string,unknown>>{const host=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;if(!host)throw new Error("VERCEL_URL_not_configured");const target=`https://${host.replace(/^https?:\/\//,"")}/`;const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),10000);try{const response=await fetch(target,{method:"GET",cache:"no-store",redirect:"follow",signal:controller.signal});return{reachable:response.ok,status:response.status,target,final_url:response.url,deployment_id:process.env.VERCEL_DEPLOYMENT_ID||null,project_id:process.env.VERCEL_PROJECT_ID||null,environment:process.env.VERCEL_ENV||null,git_commit_sha:process.env.VERCEL_GIT_COMMIT_SHA||null,git_commit_ref:process.env.VERCEL_GIT_COMMIT_REF||null,observed_at:new Date().toISOString()};}finally{clearTimeout(timeout)}}
 export async function githubRead():Promise<Record<string,unknown>>{const cfg=githubConfig();const repo=assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}`),"github_read_repo");const commit=assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/commits/${encodeURIComponent(cfg.base)}`),"github_read_commit");return{repository:cfg.repository,private:Boolean(repo?.private),default_branch:String(repo?.default_branch||cfg.base),base:cfg.base,base_sha:String(commit?.sha||""),updated_at:repo?.updated_at||null,pushed_at:repo?.pushed_at||null,write_configured:Boolean(cfg.token)};}
 async function getBranchRef(branch:string){const c=githubConfig();return githubRequest(`/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/git/ref/${encodePath(`heads/${branch}`)}`);} async function getFile(path:string,ref:string){const c=githubConfig();return githubRequest(`/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref)}`);}
+export async function fetchProductionHealth():Promise<{reachable:boolean;status:number|null;target:string|null;body:Record<string,unknown>|null}>{
+  const host=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;
+  if(!host)return{reachable:false,status:null,target:null,body:null};
+  const target=`https://${host.replace(/^https?:\/\//,"")}/api/health`;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
+  try{
+    const response=await fetch(target,{method:"GET",cache:"no-store",redirect:"follow",signal:controller.signal});
+    const body=await response.json().catch(()=>null);
+    return{reachable:response.ok,status:response.status,target,body:body&&typeof body==="object"?body as Record<string,unknown>:null};
+  }catch{
+    return{reachable:false,status:null,target,body:null};
+  }finally{clearTimeout(timeout);}
+}
+
+export async function featureProductionVerify(args:Record<string,unknown>,context:OperatorToolContext):Promise<OperatorToolReceipt>{
+  const {loadFeatureBacklogSpec,productionHealthFromJson,verifyFeatureAgainstHealth}=await import("./agentFeatureBacklog");
+  const featureId=String(args.feature_id||"");
+  const item=loadFeatureBacklogSpec().items.find(i=>i.id===featureId);
+  const health=await fetchProductionHealth();
+  const production=productionHealthFromJson(health.body,{reachable:health.reachable,status:health.status,target:health.target});
+  const result=item?verifyFeatureAgainstHealth(item,production):{verified:false,reasons:["unknown_feature_id"]};
+  return{
+    tool:"feature_production_verify",
+    authority:0,
+    request_digest:digestJson({tool:"feature_production_verify",feature_id:featureId,run_id:context.runId}),
+    expected:{reachable:true,health_matches:true,feature_id:featureId},
+    observed:{...production,reasons:result.reasons,feature_id:featureId},
+    verified:Boolean(item&&result.verified),
+    rollback_ref:null,
+    external_ref:health.target,
+    detail:{mutating:false,advances_backlog:Boolean(item&&result.verified),endpoint:item?.evidence.endpoint||null}
+  };
+}
+
+export async function githubImplementationDispatch(args:Record<string,unknown>,context:OperatorToolContext):Promise<OperatorToolReceipt>{
+  const spec=TOOL_SPECS.github_implementation_dispatch;
+  if(context.admittedAuthority<2)throw new Error("github_implementation_dispatch_authority_denied");
+  const cfg=githubConfig();
+  if(!cfg.token)throw new Error("GITHUB_OPERATOR_TOKEN_not_configured");
+  const featureId=String(args.feature_id||"unspecified").replace(/[^a-z0-9_]/g,"").slice(0,40)||"unspecified";
+  const title=String(args.title||featureId).slice(0,120);
+  const acceptance=Array.isArray(args.acceptance)?args.acceptance.map(v=>String(v)).slice(0,12):[];
+  const before=await githubRead();
+  const baseSha=String(before.base_sha||"");
+  const branch=`agent/run-${context.runId}-${featureId}-dispatch`;
+  const artifactPath=`agent-runs/dispatch-${context.runId}-${featureId}.json`;
+  const artifact={
+    harness:"closure-native-v1",
+    loop:"execution-bearing-v1",
+    run_id:context.runId,
+    signal_id:context.signalId,
+    feature_id:featureId,
+    title,
+    acceptance,
+    base_branch:cfg.base,
+    base_sha:baseSha,
+    isolated_branch:branch,
+    action:"github_implementation_dispatch",
+    invariant:"write_isolated_dispatch_only;do_not_merge;do_not_modify_base;heartbeat_is_not_progress"
+  };
+  const artifactText=`${JSON.stringify(artifact,null,2)}\n`;
+  const expectedDigest=sha256(artifactText);
+  const requestDigest=digestJson({tool:spec.name,run_id:context.runId,signal_id:context.signalId,base_sha:baseSha,branch,artifact_path:artifactPath,artifact_digest:expectedDigest});
+  let branchRef=await getBranchRef(branch);
+  if(branchRef.status===404){
+    assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/git/refs`,{method:"POST",body:JSON.stringify({ref:`refs/heads/${branch}`,sha:baseSha})},true),"github_create_dispatch_branch");
+    branchRef=await getBranchRef(branch);
+  }
+  const branchStartSha=String(assertGithub(branchRef,"github_read_dispatch_branch")?.object?.sha||"");
+  let writeCommitSha:string|null=null;
+  let existing=await getFile(artifactPath,branch);
+  if(existing.status===404){
+    const created=assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${encodePath(artifactPath)}`,{method:"PUT",body:JSON.stringify({message:`Agent implementation dispatch ${featureId} run ${context.runId}`,content:Buffer.from(artifactText,"utf8").toString("base64"),branch})},true),"github_write_dispatch_artifact");
+    writeCommitSha=String(created?.commit?.sha||"")||null;
+    existing=await getFile(artifactPath,branch);
+  }
+  const readback=assertGithub(existing,"github_readback_dispatch_artifact");
+  const observedDigest=sha256(decodeGithubContent(readback));
+  const basePathAbsent=(await getFile(artifactPath,cfg.base)).status===404;
+  const branchHeadSha=String(assertGithub(await getBranchRef(branch),"github_read_dispatch_branch_after")?.object?.sha||"");
+  let prUrl:string|null=null;
+  let prNumber:number|null=null;
+  try{
+    const pr=await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/pulls`,{method:"POST",body:JSON.stringify({
+      title:`Agent dispatch: ${title}`,
+      head:branch,
+      base:cfg.base,
+      draft:true,
+      body:[
+        `Execution-bearing dispatch for **${title}** (\`${featureId}\`).`,
+        "",
+        "This isolated branch is the implementation path. It does not merge itself.",
+        "Heartbeat / strategy reports are not feature progress.",
+        "",
+        "Acceptance:",
+        ...acceptance.map(line=>`- ${line}`)
+      ].join("\n")
+    })},true);
+    if(pr.ok){
+      prUrl=String(pr.data?.html_url||"")||null;
+      prNumber=Number(pr.data?.number||0)||null;
+    }
+  }catch{/* draft PR is best-effort; branch+artifact is the dispatch */}
+  const verified=observedDigest===expectedDigest&&basePathAbsent&&Boolean(branchHeadSha)&&branchHeadSha!==baseSha;
+  return{
+    tool:spec.name,
+    authority:2,
+    request_digest:requestDigest,
+    expected:{base_sha:baseSha,branch,artifact_path:artifactPath,artifact_digest:expectedDigest,base_path_absent:true,merged:false},
+    observed:{branch_start_sha:branchStartSha,branch_head_sha:branchHeadSha,artifact_digest:observedDigest,base_path_absent:basePathAbsent,pr_url:prUrl,pr_number:prNumber},
+    verified,
+    rollback_ref:`refs/heads/${branch}`,
+    external_ref:prUrl||writeCommitSha||branchHeadSha||null,
+    detail:{repository:cfg.repository,base:cfg.base,branch,artifact_path:artifactPath,merged:false,feature_id:featureId,advances_backlog:false}
+  };
+}
+
 export async function githubBranchDiagnostic(context:OperatorToolContext):Promise<OperatorToolReceipt>{const spec=TOOL_SPECS.github_branch_diagnostic;if(context.admittedAuthority<2)throw new Error("github_branch_diagnostic_authority_denied");const cfg=githubConfig();if(!cfg.token)throw new Error("GITHUB_OPERATOR_TOKEN_not_configured");const before=await githubRead();const baseSha=String(before.base_sha||"");const branch=`agent/run-${context.runId}-closure-probe`,artifactPath=`agent-runs/run-${context.runId}.json`;const artifact={harness:"closure-native-v1",run_id:context.runId,signal_id:context.signalId,base_branch:cfg.base,base_sha:baseSha,isolated_branch:branch,action:"github_branch_diagnostic",invariant:"write_isolated_diagnostic_only;do_not_merge;do_not_modify_base"};const artifactText=`${JSON.stringify(artifact,null,2)}\n`,expectedDigest=sha256(artifactText),requestDigest=digestJson({tool:spec.name,run_id:context.runId,signal_id:context.signalId,base_sha:baseSha,branch,artifact_path:artifactPath,artifact_digest:expectedDigest});let branchRef=await getBranchRef(branch);if(branchRef.status===404){assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/git/refs`,{method:"POST",body:JSON.stringify({ref:`refs/heads/${branch}`,sha:baseSha})},true),"github_create_probe_branch");branchRef=await getBranchRef(branch);}const branchStartSha=String(assertGithub(branchRef,"github_read_probe_branch")?.object?.sha||"");let writeCommitSha:string|null=null;let existing=await getFile(artifactPath,branch);if(existing.status===404){const created=assertGithub(await githubRequest(`/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${encodePath(artifactPath)}`,{method:"PUT",body:JSON.stringify({message:`Agent closure probe run ${context.runId}`,content:Buffer.from(artifactText,"utf8").toString("base64"),branch})},true),"github_write_probe_artifact");writeCommitSha=String(created?.commit?.sha||"")||null;existing=await getFile(artifactPath,branch);}const readback=assertGithub(existing,"github_readback_probe_artifact"),observedDigest=sha256(decodeGithubContent(readback)),basePathAbsent=(await getFile(artifactPath,cfg.base)).status===404,branchHeadSha=String(assertGithub(await getBranchRef(branch),"github_read_probe_branch_after")?.object?.sha||"");return{tool:spec.name,authority:2,request_digest:requestDigest,expected:{base_sha:baseSha,branch,artifact_path:artifactPath,artifact_digest:expectedDigest,base_path_absent:true},observed:{branch_start_sha:branchStartSha,branch_head_sha:branchHeadSha,artifact_digest:observedDigest,base_path_absent:basePathAbsent,artifact_blob_sha:readback?.sha||null},verified:observedDigest===expectedDigest&&basePathAbsent&&Boolean(branchHeadSha)&&branchHeadSha!==baseSha,rollback_ref:`refs/heads/${branch}`,external_ref:writeCommitSha||branchHeadSha||null,detail:{repository:cfg.repository,base:cfg.base,branch,artifact_path:artifactPath,merged:false}};}
-export async function executeOperatorTool(name:OperatorToolName,args:Record<string,unknown>,context:OperatorToolContext):Promise<OperatorToolReceipt>{const spec=TOOL_SPECS[name];if(!spec)throw new Error(`unknown_operator_tool:${name}`);if(context.admittedAuthority<spec.authority)throw new Error(`operator_tool_authority_denied:${name}`);if(name==="project_context_read"){const observed=await projectContextRead();return{tool:name,authority:0,request_digest:digestJson({name,args,run_id:context.runId}),expected:{readable:true},observed,verified:true,rollback_ref:null,external_ref:null,detail:{mutating:false}};}if(name==="github_read"){const observed=await githubRead();return{tool:name,authority:0,request_digest:digestJson({name,args,run_id:context.runId}),expected:{base_sha_present:true},observed,verified:Boolean(observed.base_sha),rollback_ref:null,external_ref:String(observed.base_sha||"")||null,detail:{mutating:false}};}if(name==="vercel_observe"){const observed=await vercelObserve();return{tool:name,authority:0,request_digest:digestJson({name,run_id:context.runId}),expected:{reachable:true,deployment_identity:true},observed,verified:Boolean(observed.reachable&&observed.git_commit_sha),rollback_ref:null,external_ref:String(observed.deployment_id||observed.git_commit_sha||"")||null,detail:{mutating:false,source:"vercel_runtime_plus_independent_http"}};}if(name==="github_branch_diagnostic")return githubBranchDiagnostic(context);if(name==="browser_observe"){const target=String(args.url||"https://chatgpt.com/");const observed=await browserObservationProbe(target);return{tool:name,authority:2,request_digest:digestJson({name,target,run_id:context.runId,signal_id:context.signalId}),expected:{runtime_reachable:true,independent_reread:true,digest_match:true,target_host:"chatgpt.com"},observed:observed as any,verified:Boolean(observed.ok),rollback_ref:null,external_ref:(observed.first?.snapshot_digest as string)||null,detail:{mutating:false,credential_boundary:"server-side bearer only",target}};}throw new Error(`unimplemented_operator_tool:${name}`);}
+export async function executeOperatorTool(name:OperatorToolName,args:Record<string,unknown>,context:OperatorToolContext):Promise<OperatorToolReceipt>{const spec=TOOL_SPECS[name];if(!spec)throw new Error(`unknown_operator_tool:${name}`);if(context.admittedAuthority<spec.authority)throw new Error(`operator_tool_authority_denied:${name}`);if(name==="project_context_read"){const observed=await projectContextRead();return{tool:name,authority:0,request_digest:digestJson({name,args,run_id:context.runId}),expected:{readable:true},observed,verified:true,rollback_ref:null,external_ref:null,detail:{mutating:false}};}if(name==="github_read"){const observed=await githubRead();return{tool:name,authority:0,request_digest:digestJson({name,args,run_id:context.runId}),expected:{base_sha_present:true},observed,verified:Boolean(observed.base_sha),rollback_ref:null,external_ref:String(observed.base_sha||"")||null,detail:{mutating:false}};}if(name==="vercel_observe"){const observed=await vercelObserve();return{tool:name,authority:0,request_digest:digestJson({name,run_id:context.runId}),expected:{reachable:true,deployment_identity:true},observed,verified:Boolean(observed.reachable&&observed.git_commit_sha),rollback_ref:null,external_ref:String(observed.deployment_id||observed.git_commit_sha||"")||null,detail:{mutating:false,source:"vercel_runtime_plus_independent_http"}};}if(name==="github_branch_diagnostic")return githubBranchDiagnostic(context);if(name==="github_implementation_dispatch")return githubImplementationDispatch(args,context);if(name==="feature_production_verify")return featureProductionVerify(args,context);if(name==="browser_observe"){const target=String(args.url||"https://chatgpt.com/");const observed=await browserObservationProbe(target);return{tool:name,authority:2,request_digest:digestJson({name,target,run_id:context.runId,signal_id:context.signalId}),expected:{runtime_reachable:true,independent_reread:true,digest_match:true,target_host:"chatgpt.com"},observed:observed as any,verified:Boolean(observed.ok),rollback_ref:null,external_ref:(observed.first?.snapshot_digest as string)||null,detail:{mutating:false,credential_boundary:"server-side bearer only",target}};}throw new Error(`unimplemented_operator_tool:${name}`);}

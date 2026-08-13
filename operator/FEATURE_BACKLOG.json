@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "updated": "2026-08-13",
+  "note": "Harry-specified Rate My Face product features only. Status is derived from repo/production evidence (flags, OpenAPI, health, tables), not heartbeat or run counts. Heartbeats supervise; they do not ship features.",
+  "items": [
+    {
+      "id": "account_learning",
+      "title": "Account Learning",
+      "priority": 1,
+      "acceptance": [
+        "OpenAPI getPersonalNetwork and updatePersonalNetwork are present",
+        "Health account_learning.retrieve_action is getPersonalNetwork",
+        "Paid Personal Network writes persist rmf_interactions and derive rmf_personal_recommendations",
+        "Product credits stay 1-credit (PERSONAL_ACTION_COST); no parallel billing path"
+      ],
+      "evidence": {
+        "openapi_operations": ["getPersonalNetwork", "updatePersonalNetwork"],
+        "health_enabled_path": "account_learning.retrieve_action",
+        "health_enabled_equals": "getPersonalNetwork",
+        "tables": ["rmf_personal_profiles", "rmf_interactions", "rmf_personal_recommendations"],
+        "endpoint": "/api/personal"
+      }
+    },
+    {
+      "id": "compare_me_to_me",
+      "title": "Compare Me To Me",
+      "priority": 2,
+      "acceptance": [
+        "Paid OpenAPI compareMeToMe Action is enabled",
+        "Health compare_me_to_me.enabled is true",
+        "POST /api/compare meters 1 credit with consent_compare and real image refs",
+        "Unauthenticated compare is not free; job listing stays non-public"
+      ],
+      "evidence": {
+        "flag_module": "COMPARE_ME_TO_ME.enabled",
+        "openapi_operations": ["compareMeToMe"],
+        "health_enabled_path": "compare_me_to_me.enabled",
+        "tables": ["rmf_compare_jobs", "rmf_compare_results"],
+        "endpoint": "/api/compare"
+      }
+    },
+    {
+      "id": "appearance_agent",
+      "title": "Appearance Agent",
+      "priority": 3,
+      "acceptance": [
+        "APPEARANCE_AGENT.enabled is true only after Account Learning + Compare gates",
+        "Health appearance_agent.enabled is true",
+        "OpenAPI Action exists when enabled; until then stubs stay disabled / not LIVE coaching",
+        "Future paid ops use the same 1-credit unit"
+      ],
+      "evidence": {
+        "flag_module": "APPEARANCE_AGENT.enabled",
+        "openapi_operations": [],
+        "health_enabled_path": "appearance_agent.enabled",
+        "tables": ["rmf_appearance_plans", "rmf_appearance_checkins"],
+        "endpoint": "/api/appearance"
+      }
+    },
+    {
+      "id": "social_oauth",
+      "title": "Social OAuth",
+      "priority": 4,
+      "acceptance": [
+        "User-authorized Instagram / LinkedIn / TikTok OAuth only — no scraping",
+        "Health social_providers.enabled is true only when provider secrets exist",
+        "Connect/disconnect persist encrypted token_ref, never raw tokens",
+        "Do not invent extra social products"
+      ],
+      "evidence": {
+        "flag_module": "SOCIAL_PROVIDER_OAUTH.enabled",
+        "openapi_operations": [],
+        "health_enabled_path": "social_providers.enabled",
+        "tables": ["rmf_provider_connections"],
+        "endpoint": "/api/providers",
+        "requires_secret": true
+      }
+    }
+  ]
+}

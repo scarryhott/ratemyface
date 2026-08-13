@@ -24,7 +24,15 @@ type ChatMessage = {
 type AgentsPayload = {
   ok: boolean;
   error?: string;
-  queue?: { signals_queued: number; pending_approvals: number; runs_7d: number };
+  queue?: { signals_queued: number; pending_approvals: number; runs_7d: number; note?: string };
+  backlog?: {
+    current_item?: any | null;
+    last_receipt?: any | null;
+    blocked_on?: string | null;
+    items?: any[];
+    note?: string;
+    feature_progress_from_counts?: boolean;
+  };
   strategy?: {
     latest: any | null;
     history: any[];
@@ -57,7 +65,7 @@ export function AgentConsoleSection({
       id: "welcome",
       role: "system",
       content:
-        "Agent Console — chat with the operator agent, queue improve cycles, approve work, and read strategy impact reports. Missing business metrics stay Unavailable.",
+        "Agent Console — heartbeats supervise the build loop; they do not ship features. Backlog status comes from repo/production evidence. Missing business metrics stay Unavailable.",
       at: new Date().toISOString()
     }
   ]);
@@ -153,9 +161,9 @@ export function AgentConsoleSection({
           id: `improve_${Date.now()}`,
           role: "assistant",
           content: report
-            ? `Autonomous improve cycle complete.\n${report.summary || ""}\nBottleneck: ${report.bottleneck}\nNext: ${report.recommended_next_step}\nExpected effect: ${report.expected_metric_effect}`
-            : body.run?.plan?.summary || "Improve cycle finished (no strategy report).",
-          meta: `business_improve · status=${body.run?.status || "?"}`,
+            ? `Build cycle ${body.cycle?.outcome || body.run?.status || "finished"}.\n${report.summary || ""}\nFeature progress: ${body.feature_progress ? "yes (verified receipt)" : "no"}\nBlocked on: ${body.blocked_on || "—"}\nBottleneck: ${report.bottleneck}\nNext: ${report.recommended_next_step}`
+            : body.run?.plan?.summary || "Build cycle finished (no strategy report). Heartbeat/report-only is not feature progress.",
+          meta: `business_improve · status=${body.run?.status || "?"} · progress=${body.feature_progress ? "verified" : "none"}`,
           at: new Date().toISOString()
         }
       ]);
@@ -214,7 +222,7 @@ export function AgentConsoleSection({
       <SectionHeading
         id="agents"
         title="Chat & manage agents"
-        subtitle="Send messages, run improve cycles, approve work, and read how strategy helps the business. Your Grok bot can keep doing hourly ChatGPT checks — this console is the operator control surface."
+        subtitle="Heartbeats enqueue a build cycle; the worker dispatches or verifies the next unfinished feature. Run/signal counts are ops activity, not roadmap progress."
       />
 
       <section style={grid2}>
@@ -279,7 +287,34 @@ export function AgentConsoleSection({
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Manage</h3>
+          <h3 style={{ marginTop: 0 }}>Build loop</h3>
+          <FunnelRow
+            label="Current backlog item"
+            value={text(agents?.backlog?.current_item?.title || "None unfinished")}
+          />
+          <FunnelRow
+            label="Loop status"
+            value={text(agents?.backlog?.current_item?.loop_status || "idle")}
+          />
+          <FunnelRow
+            label="Blocked on"
+            value={text(agents?.backlog?.blocked_on || "—")}
+          />
+          <FunnelRow
+            label="Last receipt"
+            value={
+              agents?.backlog?.last_receipt
+                ? `${text(agents.backlog.last_receipt.kind)} · ${
+                    agents.backlog.last_receipt.advances_backlog ? "advances backlog" : "does not advance"
+                  }`
+                : "None"
+            }
+          />
+          <p className="muted" style={{ marginTop: 8, marginBottom: 16 }}>
+            {agents?.backlog?.note ||
+              "Backlog advances only on a verified production receipt. Heartbeat success is not feature progress."}
+          </p>
+          <h4 style={{ marginBottom: 8 }}>Ops activity (not feature progress)</h4>
           <FunnelRow label="Queued signals" value={num(agents?.queue?.signals_queued)} />
           <FunnelRow label="Pending approvals" value={num(agents?.queue?.pending_approvals)} />
           <FunnelRow label="Runs · 7d" value={num(agents?.queue?.runs_7d)} />
@@ -295,6 +330,25 @@ export function AgentConsoleSection({
             {agents?.commercial_loop ||
               "free GPT → Action → account → persistence → credits → retention → experiment → profit"}
           </p>
+          {!!agents?.backlog?.items?.length && (
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ marginBottom: 8 }}>Specified backlog</h4>
+              {agents.backlog.items.map((item: any) => (
+                <div key={item.id} style={activity}>
+                  <div>
+                    <strong>
+                      {item.priority}. {item.title}
+                    </strong>{" "}
+                    · {text(item.loop_status)}
+                    <div className="muted">
+                      evidence {item.evidence_complete ? "complete" : "incomplete"}
+                      {item.blocked_on ? ` · blocked on ${item.blocked_on}` : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {!!agents?.pending_approvals?.length && (
             <div style={{ marginTop: 16 }}>

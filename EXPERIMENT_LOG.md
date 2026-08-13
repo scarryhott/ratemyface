@@ -161,3 +161,15 @@ Append one concise entry per material experiment.
 - **Change made:** paid Appearance Actions on credits; social stays `not_configured`; affiliate/searchProduct untouched; GPT_INSTRUCTIONS.md not modified; report stays 5
 - **Rollback:** revert this commit and re-import prior OpenAPI 2.5.5
 - **Next:** re-import `/api/openapi` (do not paste GPT instructions); run consented appearancePlan then appearanceCheckin after Compare history exists
+
+### 2026-08-13 — Managerial loop is execution-bearing; heartbeats supervise
+- **Surface:** operator harness / Agent Console / Vercel cron
+- **Hypothesis:** Closing the autonomous BUILD loop (backlog → dispatch/verify → receipt) will stop treating heartbeat/run counts as product progress and will attempt implementation for the next unfinished Harry-specified feature.
+- **Variant A:** heartbeat → observe → reason → strategy report → heartbeat (current wrong closure)
+- **Variant B:** heartbeat enqueues only; worker selects the highest-priority unfinished backlog item, dispatches GitHub L2 or verifies production, and advances the backlog only on a verified receipt
+- **Metric:** unfinished cycle attempts `github_implementation_dispatch` or `feature_production_verify`; heartbeat 200/202 in under 10s with idempotent enqueue; console shows backlog item + last receipt + blocked-on; run/signal counts are labeled ops activity
+- **Evidence/source:** prod heartbeat 504 at 2026-08-13 14:13:14 UTC (SHA 0a654bb) after snapshot→enqueue→runOneSignal; Cursor agents shipped only when explicitly tasked (PRs #25–#30). Compare paid Action is PR #30; Appearance paid Action is PR #31.
+- **Result:** pending deploy of enqueue-only heartbeat + worker cron + backlog state machine
+- **Change made:** versioned `operator/FEATURE_BACKLOG.json`; managerial state machine; L2 implementation dispatch + L0 production verify; heartbeat no longer runs the worker or agent-schema DDL; Agent Console no longer treats counts as feature progress. Does not revert Compare/Appearance paid Actions. GPT_INSTRUCTIONS.md and Amazon/affiliate untouched.
+- **Rollback:** revert this commit; prior daily heartbeat will again run `runOneSignal` inline
+- **Next / monitor:** cron 200/202 under 10s; retries do not duplicate the daily signal; worker records honest idle/blocked or a dispatch/verify receipt

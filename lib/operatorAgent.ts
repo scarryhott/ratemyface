@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import { db, newSchemaSlot, runOncePerDbClient } from "./db";
 import {
+  classifyCycle,
+  decideManagerialAction,
+  inspectRepoEvidence,
+  managerialPlan,
+  type ManagerialDecision
+} from "./agentFeatureBacklog";
+import {
+  appendFeatureReceipt,
+  readFeatureReceipts,
+  realizeFeatureBacklogConsole,
+  receiptFromTool,
   recordStrategyFromRun,
   type BusinessMetricsSnapshot
 } from "./agentBusinessLoop";
@@ -177,6 +188,77 @@ export async function enqueueSignal(
     returning id,status,requested_authority,created_at
   `;
   return result[0];
+}
+
+/**
+ * Heartbeat hot path: insert or return the existing signal.
+ * Does not run agent-schema DDL. Retries with the same key cannot duplicate.
+ */
+export async function enqueueSignalIdempotent(
+  source: string,
+  kind: string,
+  payload: Record<string, unknown>,
+  authority: Authority,
+  idempotencyKey: string
+) {
+  const sql = db();
+  const key = String(idempotencyKey).slice(0, 160);
+  const nextPayload = { ...payload, idempotency_key: key };
+
+  const existing = await sql`
+    select id, status, requested_authority, created_at
+    from rmf_agent_signals
+    where payload->>'idempotency_key' = ${key}
+    order by created_at desc
+    limit 1
+  `;
+  if (existing[0]) {
+    return {
+      id: Number(existing[0].id),
+      status: String(existing[0].status),
+      requested_authority: Number(existing[0].requested_authority),
+      created_at: existing[0].created_at,
+      duplicate: true,
+      idempotency_key: key
+    };
+  }
+
+  try {
+    const claim = await sql`
+      insert into rmf_agent_context(key, value, updated_at)
+      values(${`idempotency:${key}`}, ${sql.json({ claimed_at: new Date().toISOString() })}, now())
+      on conflict(key) do nothing
+      returning key
+    `;
+    if (claim.length === 0) {
+      const again = await sql`
+        select id, status, requested_authority, created_at
+        from rmf_agent_signals
+        where payload->>'idempotency_key' = ${key}
+        order by created_at desc
+        limit 1
+      `;
+      if (again[0]) {
+        return {
+          id: Number(again[0].id),
+          status: String(again[0].status),
+          requested_authority: Number(again[0].requested_authority),
+          created_at: again[0].created_at,
+          duplicate: true,
+          idempotency_key: key
+        };
+      }
+    }
+  } catch {
+    // Context table may be missing; still attempt the signal insert.
+  }
+
+  const result = await sql`
+    insert into rmf_agent_signals(source,kind,payload,requested_authority)
+    values(${source},${kind},${sql.json(nextPayload as any)},${authority})
+    returning id,status,requested_authority,created_at
+  `;
+  return { ...result[0], duplicate: false, idempotency_key: key };
 }
 
 export async function nextSignal() {
@@ -375,6 +457,31 @@ export async function runOneSignal() {
       ? (signal.payload as Record<string, unknown>)
       : {};
   const metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
+  const kind = String(signal.kind);
+  const isBuildCycle = kind === "business_improve" || kind === "heartbeat";
+  let managerial: ManagerialDecision | null = null;
+  if (isBuildCycle) {
+    const receipts = await readFeatureReceipts();
+    managerial = decideManagerialAction({
+      evidence: inspectRepoEvidence(),
+      receipts,
+      admittedAuthority
+    });
+    payload.managerial_action = {
+      kind: managerial.action,
+      feature_id: managerial.selected_item?.id || null,
+      title: managerial.selected_item?.title || null,
+      acceptance: managerial.selected_item?.acceptance || [],
+      blocked_on: managerial.blocked_on,
+      reason: managerial.reason
+    };
+    signal.payload = payload;
+    try {
+      await realizeFeatureBacklogConsole();
+    } catch {
+      /* console persist is best-effort */
+    }
+  }
 
   async function persistStrategy(
     status: string,
@@ -418,28 +525,39 @@ export async function runOneSignal() {
     }, "project_context_read");
 
     let ai: { model: string; plan: OperatorModelPlan; usage: any };
-    try {
-      ai = await gatewayPlan({
-        signal: {
-          id: signal.id,
-          source: signal.source,
-          kind: signal.kind,
-          payload: signal.payload
-        },
-        admitted_authority: admittedAuthority,
-        project: context
-      });
-    } catch (error) {
-      const reason = errorMessage(error);
-      if (String(signal.kind) === "control_probe") {
-        ai = { model: "deterministic-closure-taskset", plan: fallbackProbePlan(), usage: null };
-      } else {
-        ai = { model: "safe-planner-fallback", plan: fallbackAnalysisPlan(reason), usage: null };
+    if (isBuildCycle && managerial) {
+      ai = { model: "managerial-loop-v1", plan: managerialPlan(managerial), usage: null };
+      await ledger(runId, "managerial_selected", admittedAuthority, {
+        action: managerial.action,
+        feature_id: managerial.selected_item?.id || null,
+        blocked_on: managerial.blocked_on,
+        reason: managerial.reason,
+        feature_progress: false
+      }, "feature_backlog", managerial.action !== "blocked" && managerial.action !== "idle");
+    } else {
+      try {
+        ai = await gatewayPlan({
+          signal: {
+            id: signal.id,
+            source: signal.source,
+            kind: signal.kind,
+            payload: signal.payload
+          },
+          admitted_authority: admittedAuthority,
+          project: context
+        });
+      } catch (error) {
+        const reason = errorMessage(error);
+        if (String(signal.kind) === "control_probe") {
+          ai = { model: "deterministic-closure-taskset", plan: fallbackProbePlan(), usage: null };
+        } else {
+          ai = { model: "safe-planner-fallback", plan: fallbackAnalysisPlan(reason), usage: null };
+        }
+        await ledger(runId, "planner_fallback", admittedAuthority, {
+          reason,
+          fallback: String(signal.kind) === "control_probe" ? "deterministic_control_probe" : "safe_halt"
+        }, String(signal.kind) === "control_probe" ? "control_probe" : "project_context_read", false);
       }
-      await ledger(runId, "planner_fallback", admittedAuthority, {
-        reason,
-        fallback: String(signal.kind) === "control_probe" ? "deterministic_control_probe" : "safe_halt"
-      }, String(signal.kind) === "control_probe" ? "control_probe" : "project_context_read", false);
     }
 
     const closure = resolveClosure(signal, ai.plan, admittedAuthority);
@@ -463,9 +581,12 @@ export async function runOneSignal() {
         insert into rmf_agent_approvals(run_id,capability,requested_authority,rationale)
         values(${runId},${capability},${closure.required_authority},${`${closure.reason}: ${ai.plan.summary || "Expanded authority requested"}`})
       `;
+      const cycle = managerial
+        ? classifyCycle({ decision: managerial, closureState: "awaiting_approval" })
+        : null;
       await sql`
         update rmf_agent_runs
-        set status='awaiting_approval',result=${sql.json({ usage: ai.usage, executed: false, closure } as any)},completed_at=now()
+        set status='awaiting_approval',result=${sql.json({ usage: ai.usage, executed: false, closure, cycle, feature_progress: false } as any)},completed_at=now()
         where id=${runId}
       `;
       await sql`update rmf_agent_signals set status='awaiting_approval',completed_at=now() where id=${signal.id}`;
@@ -477,29 +598,53 @@ export async function runOneSignal() {
         harness: "closure-native-v1",
         plan: ai.plan,
         closure,
+        cycle,
+        feature_progress: false,
+        blocked_on: cycle?.blocked_on || "approval",
         strategy_report
       };
     }
 
     if (closure.state === "halted" || !closure.selected) {
+      const cycle = managerial
+        ? classifyCycle({
+            decision: managerial,
+            executedTool: null,
+            closureState: closure.state
+          })
+        : null;
+      const honestIdle = managerial?.action === "idle";
+      const status = cycle?.outcome === "noop_failed" ? "failed" : honestIdle ? "completed" : "halted";
+      const closureState = honestIdle
+        ? "idle_no_unfinished"
+        : cycle?.outcome === "blocked"
+          ? "blocked"
+          : cycle?.outcome === "noop_failed"
+            ? "noop_failed"
+            : closure.state;
       await sql`
         update rmf_agent_runs
-        set status='halted',result=${sql.json({ usage: ai.usage, executed: false, closure } as any)},completed_at=now()
+        set status=${status},closure_state=${closureState},result=${sql.json({ usage: ai.usage, executed: false, closure, cycle, feature_progress: false } as any)},completed_at=now()
         where id=${runId}
       `;
-      await sql`update rmf_agent_signals set status='completed',completed_at=now() where id=${signal.id}`;
-      await ledger(runId, "self_limit_halt", admittedAuthority, {
-        reason: closure.reason,
-        self_limit: closure.self_limit
-      }, undefined, false);
-      const strategy_report = await persistStrategy("halted", ai.plan, closure.state);
+      await sql`update rmf_agent_signals set status=${status === "failed" ? "failed" : "completed"},completed_at=now() where id=${signal.id}`;
+      await ledger(runId, honestIdle ? "managerial_idle" : cycle?.outcome === "noop_failed" ? "managerial_noop_failed" : "self_limit_halt", admittedAuthority, {
+        reason: managerial?.reason || closure.reason,
+        self_limit: closure.self_limit,
+        cycle,
+        feature_progress: false
+      }, undefined, honestIdle);
+      const strategy_report = await persistStrategy(status, ai.plan, closureState);
       return {
-        ok: true,
+        ok: honestIdle || cycle?.outcome === "blocked",
         run_id: runId,
-        status: "halted",
+        status,
         harness: "closure-native-v1",
         plan: ai.plan,
         closure,
+        cycle,
+        feature_progress: false,
+        blocked_on: cycle?.blocked_on || managerial?.blocked_on || null,
         strategy_report
       };
     }
@@ -530,34 +675,73 @@ export async function runOneSignal() {
       external_ref: receipt.external_ref
     }, receipt.tool, receipt.verified);
 
-    const finalStatus = receipt.verified ? "completed" : "verification_failed";
+    const cycle = managerial
+      ? classifyCycle({
+          decision: managerial,
+          executedTool: receipt.tool,
+          closureState: receipt.verified ? "closed" : "verification_failed",
+          receiptVerified: receipt.verified
+        })
+      : null;
+    if (managerial && (receipt.tool === "feature_production_verify" || receipt.tool === "github_implementation_dispatch")) {
+      try {
+        await appendFeatureReceipt(
+          receiptFromTool({
+            itemId: managerial.selected_item?.id || null,
+            kind: receipt.tool === "feature_production_verify" ? "production_verify" : "implementation_dispatch",
+            verified: receipt.verified,
+            runId,
+            signalId: Number(signal.id),
+            externalRef: receipt.external_ref,
+            blockedOn: cycle?.blocked_on || null,
+            detail: {
+              tool: receipt.tool,
+              expected: receipt.expected,
+              observed: receipt.observed,
+              advances_backlog: receipt.detail?.advances_backlog === true
+            }
+          })
+        );
+        await realizeFeatureBacklogConsole();
+      } catch {
+        /* receipt persist is best-effort after the tool already ran */
+      }
+    }
+    const noopFailed = cycle?.outcome === "noop_failed";
+    const finalStatus = noopFailed ? "failed" : receipt.verified ? "completed" : "verification_failed";
+    const closureState = noopFailed ? "noop_failed" : receipt.verified ? "closed" : "verification_failed";
     await sql`
       update rmf_agent_runs
-      set status=${finalStatus},closure_state=${receipt.verified ? "closed" : "verification_failed"},
-          result=${sql.json({ usage: ai.usage, executed: true, closure, receipt_id: receiptRow.id, receipt } as any)},
+      set status=${finalStatus},closure_state=${closureState},
+          result=${sql.json({ usage: ai.usage, executed: true, closure, receipt_id: receiptRow.id, receipt, cycle, feature_progress: cycle?.feature_progress === true } as any)},
           completed_at=now()
       where id=${runId}
     `;
     await sql`
       update rmf_agent_signals
-      set status=${receipt.verified ? "completed" : "failed"},completed_at=now()
+      set status=${finalStatus === "completed" ? "completed" : "failed"},completed_at=now()
       where id=${signal.id}
     `;
-    await ledger(runId, receipt.verified ? "closure_closed" : "closure_failed", admittedAuthority, {
+    await ledger(runId, noopFailed ? "managerial_noop_failed" : receipt.verified ? "closure_closed" : "closure_failed", admittedAuthority, {
       tool: receipt.tool,
       verified: receipt.verified,
+      cycle,
+      feature_progress: cycle?.feature_progress === true,
       self_limit: "halt_after_one_tool_return"
-    }, receipt.tool, receipt.verified);
+    }, receipt.tool, receipt.verified && !noopFailed);
 
-    const strategy_report = await persistStrategy(finalStatus, ai.plan, receipt.verified ? "closed" : "verification_failed");
+    const strategy_report = await persistStrategy(finalStatus, ai.plan, closureState);
     return {
-      ok: receipt.verified,
+      ok: receipt.verified && !noopFailed,
       run_id: runId,
       status: finalStatus,
       harness: "closure-native-v1",
       plan: ai.plan,
       closure,
       receipt,
+      cycle,
+      feature_progress: cycle?.feature_progress === true,
+      blocked_on: cycle?.blocked_on || null,
       strategy_report
     };
   } catch (error) {
