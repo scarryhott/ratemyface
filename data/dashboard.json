@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-08-13T21:16:35Z",
+  "updated_at": "2026-08-13T22:32:07Z",
   "vital_stats": [
     {
-      "label": "Available or ready",
-      "value": 13,
-      "note": "3 live · 2 paid · 8 ready"
+      "label": "Available now",
+      "value": 12,
+      "note": "3 live · 9 paid"
     },
     {
       "label": "Account users",
@@ -49,10 +49,10 @@
     },
     {
       "name": "What Works For Me",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Synthesizes saved preferences and demonstrated outcomes without turning sparse evidence into false confidence.",
-      "stats": ["PR #37", "Evidence confidence states"]
+      "stats": ["5-credit report", "Evidence confidence states"]
     },
     {
       "name": "Compare Me To Me",
@@ -70,10 +70,10 @@
     },
     {
       "name": "Personal Experiments",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Tracks user-defined A/B outcomes with explicit insufficient, tied, favors A, or favors B evidence closure.",
-      "stats": ["PR #38", "2 outcomes per option", "1 credit per write", "0 experiments yet"]
+      "stats": ["1 credit", "2 outcomes per option", "0 experiments yet"]
     },
     {
       "name": "Social OAuth",
@@ -84,43 +84,43 @@
     },
     {
       "name": "Ask My History",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Answers from the user's own saved evidence and returns insufficient when no stored record matches.",
       "stats": ["1 credit", "7 evidence sources", "No web guessing"]
     },
     {
       "name": "Outcome-aware Product Learning",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Learns from recorded outcomes on saved products while keeping sparse and tied evidence explicit.",
       "stats": ["1 credit", "2 outcomes minimum", "1–5 personal score"]
     },
     {
       "name": "Social Outcome Intelligence",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Relates user-recorded or provider-authorized metric trends without scraping or causal inference.",
       "stats": ["1 credit", "4 observations minimum", "Scraping off"]
     },
     {
       "name": "Reference Comparison",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Compares paired scores with a distinct chosen reference while bounding identity, worth, and causality claims.",
       "stats": ["1 credit", "2 paired observations", "No identity claim"]
     },
     {
       "name": "Personal Network / MCP Expansion",
-      "status": "READY",
-      "tone": "ready",
-      "summary": "Exposes five bounded read tools for a single server-scoped user; personal writes remain OAuth-only.",
-      "stats": ["5 MCP reads", "Single-user scope", "0 MCP writes"]
+      "status": "NOT CONFIGURED",
+      "tone": "blocked",
+      "summary": "Five bounded read tools are deployed, but personal MCP access waits for a server token and single-user scope; personal writes remain OAuth-only.",
+      "stats": ["5 MCP reads deployed", "User scope missing", "0 MCP writes"]
     },
     {
       "name": "Autonomous Personal Agent",
-      "status": "READY",
-      "tone": "ready",
+      "status": "PAID",
+      "tone": "paid",
       "summary": "Autonomously reads evidence and proposes the smallest next step; writes require approval and verified receipts.",
       "stats": ["Authority 0 reads", "Approval-gated writes", "Verified receipts"]
     }

@@ -31,15 +31,15 @@ describe("public feature dashboard", () => {
     const names = new Set(dashboard.features.map((feature) => feature.name));
     assert.equal(names.size, dashboard.features.length);
     assert.equal(dashboard.features.filter((feature) => feature.status === "LIVE").length, 3);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "PAID").length, 2);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "READY").length, 8);
-    assert.equal(dashboard.features.filter((feature) => feature.status === "NOT CONFIGURED").length, 0);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "PAID").length, 9);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "READY").length, 0);
+    assert.equal(dashboard.features.filter((feature) => feature.status === "NOT CONFIGURED").length, 1);
     assert.equal(dashboard.features.filter((feature) => feature.status === "PLANNED").length, 0);
   });
 
   it("uses verified database snapshot values for vital stats", () => {
     const stats = Object.fromEntries(dashboard.vital_stats.map((stat) => [stat.label, stat.value]));
-    assert.equal(stats["Available or ready"], 13);
+    assert.equal(stats["Available now"], 12);
     assert.equal(stats["Account users"], 1);
     assert.equal(stats["Saved history"], 4);
     assert.equal(stats["Credit balance"], 92);
@@ -47,25 +47,27 @@ describe("public feature dashboard", () => {
     assert.equal(stats["Credits purchased"], 0);
   });
 
-  it("includes the two newly implemented feature relations without calling them live", () => {
+  it("shows merged metered features as paid rather than open-PR ready", () => {
     const whatWorks = dashboard.features.find((feature) => feature.name === "What Works For Me");
     const experiments = dashboard.features.find((feature) => feature.name === "Personal Experiments");
-    assert.equal(whatWorks?.status, "READY");
-    assert.equal(experiments?.status, "READY");
+    assert.equal(whatWorks?.status, "PAID");
+    assert.equal(experiments?.status, "PAID");
     assert.ok(experiments?.stats.includes("2 outcomes per option"));
   });
 
-  it("shows all six personal intelligence features as ready, not planned", () => {
+  it("shows deployed personal intelligence Actions as paid and MCP as unconfigured", () => {
     for (const name of [
       "Ask My History",
       "Outcome-aware Product Learning",
       "Social Outcome Intelligence",
       "Reference Comparison",
-      "Personal Network / MCP Expansion",
       "Autonomous Personal Agent"
     ]) {
-      assert.equal(dashboard.features.find((feature) => feature.name === name)?.status, "READY");
+      assert.equal(dashboard.features.find((feature) => feature.name === name)?.status, "PAID");
     }
+    const mcp = dashboard.features.find((feature) => feature.name === "Personal Network / MCP Expansion");
+    assert.equal(mcp?.status, "NOT CONFIGURED");
+    assert.ok(mcp?.stats.includes("User scope missing"));
   });
 
   it("reflects the live TikTok OAuth connector without claiming a connected account", () => {

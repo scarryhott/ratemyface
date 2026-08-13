@@ -49,12 +49,12 @@ export default function DashboardPage() {
           <p className="featureDashboardEyebrow">Product dashboard</p>
           <h1>Features and status</h1>
           <p className="featureDashboardIntro">
-            What exists, what is ready, and the evidence needed to distinguish activity from a conclusion.
+            What is available, what still needs configuration, and the evidence needed to distinguish activity from a conclusion.
           </p>
         </div>
         <div className="featureClosureBadge">
           <strong>{available.length}</strong>
-          <span>available or ready</span>
+          <span>available now</span>
         </div>
       </header>
 
@@ -83,7 +83,7 @@ export default function DashboardPage() {
             <p className="featureDashboardEyebrow">Current product</p>
             <h2 id="available-features-title">Current feature status</h2>
           </div>
-          <p>LIVE and PAID are available. READY is implemented in an open pull request.</p>
+          <p>LIVE is active. PAID requires sign-in and credits. NOT CONFIGURED still needs setup.</p>
         </div>
         <div className="featureStatusGrid">
           {current.map((feature) => (
