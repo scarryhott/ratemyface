@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-08-12T12:18:49Z",
+  "updated_at": "2026-08-13T12:31:00Z",
   "summary": {
-    "status": "openapi_v2_5_1_live_storage_fix_deployed_activation_payment_rls_and_signup_credit_decision_pending",
+    "status": "openapi_v2_5_3_live_account_learning_active_bootstrap_credits_consuming_purchase_closure_unverified",
     "goal": "Differentiate Rate My Face from default ChatGPT through authenticated cross-session state, verified affiliate routing, and server-enforced paid persistence while preserving a useful free experience."
   },
   "metrics": {
@@ -13,25 +13,37 @@
     "paid_users": 0,
     "credit_purchases": 0,
     "stripe_checkout_sessions_observed": 0,
-    "mrr": 0
+    "mrr": 0,
+    "credit_accounts": 1,
+    "total_credit_balance": 92,
+    "lifetime_credits_purchased": 0,
+    "lifetime_credits_spent": 8,
+    "personal_profiles": 1,
+    "interactions": 2,
+    "personal_recommendations": 2,
+    "compare_test_jobs": 1,
+    "compare_test_results": 1
   },
   "integrations": {
-    "github": "connected_and_writable; backend storage fix, experiment log and dashboard updates committed today",
-    "vercel": "connected; production deployment containing recommendation-table fix and dashboard update is READY",
-    "vercel_runtime_health": "200 OK on 2026-08-12; action_auth_configured=true, database_configured=true, stripe_secret_configured=true, stripe_credit_price_configured=true, stripe_webhook_configured=true, stripe_subscription_price_configured=false",
-    "custom_gpt_actions": "OpenAPI v2.5.1 is current; today's merged/main backend storage fix did not change any Action operation, endpoint, parameter contract, auth requirement, or schema surface",
-    "canonical_gpt_instructions": "current repo instructions force account-backed Actions for explicit remember/save and preference-memory questions; ordinary chat is explicitly not storage",
-    "stripe_billing_context": "credit-metered closure documented; file labels OpenAPI v2.5.0 while repo/live schema is v2.5.1, a documentation-version drift only",
-    "amazon_product_path": "Creators API intentionally disabled; /api/product returns tagged Amazon search fallback with partner_tag=ratemyfacegpt-20 and never invents an ASIN",
-    "amazon_associates_manual_stats": "missing source; needs smallest available Associates summary screenshot/export or supported integration",
-    "chatgpt_gpt_usage_stats": "missing source; needs smallest available GPT usage screenshot/export or supported integration",
-    "accounts": "Rate My Face OAuth bridge active; Supabase has OAuth token/code/account infrastructure",
-    "database": "Supabase/Postgres core memory, billing, entitlement and credit tables exist; Personal Network-specific tables initialize after admitted paid access; saved-recommendation collision fixed on main",
-    "payments": "Stripe secret, webhook secret and credit price are configured in production; connected Stripe account currently has zero Checkout Sessions and Supabase credit accounts/ledger have zero rows, so purchase-to-credit closure has not yet been demonstrated",
-    "premium_subscription": "not configured; STRIPE_PRICE_ID_PREMIUM is absent in current credit model and premium subscription must not be advertised",
-    "security": "critical: RLS is disabled on rmf_users, rmf_user_context, rmf_conversation_summaries, rmf_recommendations, rmf_billing_accounts, rmf_entitlements, rmf_stripe_events, rmf_credit_accounts and rmf_credit_ledger; remediation requires explicit policy design before enabling RLS",
-    "pending_pr_16": "open, not merged: proposes signup/founder bootstrap credits and operator grants. Latest branch revision defaults signup grant to 100 credits unless RMF_SIGNUP_CREDITS=0. This materially changes activation/monetization behavior and requires explicit product approval before merge.",
-    "social_provider_connections": "OAuth skeleton shipped: rmf_provider_connections + /api/providers stubs return not_configured; Instagram/LinkedIn/TikTok planned OAuth-only; no live connect until secrets configured; never scrape"
+    "github": "connected_and_writable; latest main includes fail-fast Postgres timeout handling for compare/operator DB work; experiment log and dashboard updated today",
+    "vercel": "connected; latest production deployment is READY",
+    "vercel_runtime_health": "200 OK on 2026-08-13; action_auth_configured=true, database_configured=true, stripe_secret_configured=true, stripe_credit_price_configured=true, stripe_webhook_configured=true, stripe_subscription_price_configured=false; OpenAPI/account learning reports v2.5.3",
+    "vercel_runtime_errors": "24h contains pre-fix 300s DB timeout errors on compare/operator routes plus two owner-session refresh-discard conflicts; no runtime errors observed in the 10 minutes after the latest fail-fast deployment",
+    "custom_gpt_actions": "OpenAPI v2.5.3 current. No Action operation, endpoint, parameter contract, authentication requirement, or OpenAPI schema surface was added or changed in today's daily loop edits.",
+    "canonical_gpt_instructions": "repo instructions force getPersonalNetwork first for preference/memory questions and write Actions before claiming explicit remember/save succeeded; native ChatGPT remains preferred for ordinary reasoning/image work",
+    "stripe_billing_context": "credit-metered closure documented; active payment path is createCreditCheckoutSession -> Stripe-hosted Checkout -> verified webhook -> durable credit ledger -> paid Action authorization",
+    "amazon_product_path": "Creators API unavailable; /api/product returns a tagged Amazon search/results fallback using partner_tag=ratemyfacegpt-20 and never invents an ASIN",
+    "amazon_associates_manual_stats": "missing source; needs smallest available Associates summary screenshot/export or supported official integration",
+    "chatgpt_gpt_usage_stats": "missing source; needs smallest available GPT usage screenshot/export or supported official integration",
+    "accounts": "Rate My Face OAuth/account path is active; persistent account-learning rows now exist",
+    "database": "Supabase/Postgres currently has 1 rmf_users row, 1 personal profile, 2 interactions, 2 personal recommendations, 1 credit account, 9 credit-ledger rows, 1 compare job and 1 compare result",
+    "payments": "Stripe secret, webhook secret and credit price are configured; Stripe API shows 0 Checkout Sessions. Supabase credit account has 92 balance, 8 lifetime spent and 0 lifetime purchased, proving bootstrap/grant-funded paid Action usage but not purchase-to-credit closure",
+    "premium_subscription": "not configured; STRIPE_PRICE_ID_PREMIUM is absent and premium subscription must not be advertised",
+    "security": "RLS is now enabled on all listed public Rate My Face tables. Supabase security advisor still reports several server/ops tables with RLS enabled but no policies, and leaked-password protection is disabled; these are follow-up hardening items rather than the previous broad RLS-disabled exposure",
+    "signup_credit_policy": "PR #16 is merged. Default first-account bootstrap is 100 credits unless RMF_SIGNUP_CREDITS=0; credits use the same durable ledger as purchased credits and do not count as lifetime_purchased",
+    "social_provider_connections": "OAuth skeleton remains not configured/live; Instagram/LinkedIn/TikTok connect stubs are OAuth-only and scraping remains disabled",
+    "appearance_agent": "scaffold only; enabled=false and requires account learning + compare before any live paid coaching claim",
+    "compare_me_to_me": "public API remains disabled/503; authenticated internal TEST path exists, costs 1 credit, and now has 1 persisted job/result"
   },
   "action_classification": {
     "searchProduct": "FREE",
@@ -44,45 +56,47 @@
     "deleteUserContext": "ACCOUNT/SECURITY"
   },
   "quality_review": {
-    "native_chatgpt_boundary": "sound: reasoning/image work stays native; identity, persistence, credits and provider state stay server-backed",
-    "product_link_reliability": "structurally safe but lower-conversion than exact product links: current product Action always returns a tagged Amazon search/results URL because Creators API is unavailable; it does not fabricate ASINs",
-    "account_storage": "core database schema is initialized, but authenticated Personal Network read/write still needs one real GPT OAuth round trip; a recommendation table collision discovered today was fixed and deployed before first paid saved-recommendation use",
-    "conversion_bottleneck": "zero observed Stripe Checkout Sessions and no connected GPT/Amazon funnel telemetry; acquisition-to-paid activation is currently unmeasured",
-    "retention_bottleneck": "account-learning Actions exist, but successful saved preference activation and 7-day return are not measured",
-    "monetization_bottleneck": "server configuration is present, but hosted Checkout -> verified webhook -> durable credit grant -> paid Action consumption remains unverified end-to-end",
-    "security_bottleneck": "nine core product/billing tables have RLS disabled; do not enable blindly without preserving server/client access policies"
+    "native_chatgpt_boundary": "sound: ordinary reasoning/image work stays native; Actions are reserved for authenticated identity, durable state, credits and external/server-backed state",
+    "product_link_reliability": "safe but lower-conversion than exact-product linking: product route always builds a tagged amazon.com/s?k=...&tag=ratemyfacegpt-20 search URL while Creators API is unavailable; it does not fabricate product identity, price or ASIN",
+    "account_storage": "working at the database level: persistent profile/interactions/recommendations now have non-zero rows and metered credits have been consumed. Direct Custom GPT runtime quality still needs a manual transcript because GPT execution is not available through Scheduled Tasks/connectors.",
+    "conversion_bottleneck": "no connected GPT usage funnel and zero Stripe Checkout Sessions, so free recommendation -> account learning -> checkout conversion remains unmeasured",
+    "retention_bottleneck": "persistent usage exists, but 7-day authenticated return telemetry is absent",
+    "monetization_bottleneck": "bootstrap credits are being consumed, but no purchased credits or Checkout Sessions exist; hosted Checkout -> verified webhook -> purchase ledger -> paid Action consumption is not yet demonstrated",
+    "integration_health": "latest production is READY and no errors were observed in the 10 minutes after the DB fail-fast fix; monitor compare/operator routes for recurrence",
+    "security_bottleneck": "broad RLS exposure has been closed; remaining advisor findings are no-policy RLS on several server/ops tables and disabled leaked-password protection"
   },
   "current_experiment": {
-    "name": "Continuity CTA after free recommendation",
-    "variant_a": "neutral follow-up after successful free product recommendation",
-    "variant_b": "concise opt-in prompt offering account-backed preference saving for next time; paid persistence only after explicit intent/consent",
-    "success_metric": "higher updatePersonalNetwork attempts/successes per successful searchProduct; secondary credit-checkout starts and 7-day authenticated return; free recommendation completion guardrail -5% max",
-    "status": "pending_first_party_activation_telemetry_and_authenticated_gpt_test"
+    "name": "Signup credit bootstrap vs paid-first activation",
+    "variant_a": "RMF_SIGNUP_CREDITS=0; new authenticated account reaches credits_required before first persistent Action",
+    "variant_b": "current default 100 signup credits through the same durable credit ledger",
+    "success_metric": "higher successful updatePersonalNetwork/getPersonalNetwork activations per new OAuth account; secondary credits consumed before first checkout, checkout conversion after exhaustion, and 7-day authenticated return",
+    "status": "early_variant_b_activation_observed_not_causal; needs cohort/event telemetry before A/B interpretation"
   },
   "research": {
-    "competitor_pattern": "Public ChatGPT competitors remain easy to copy at the one-shot layer: MOG.EXE and multiple skincare GPTs center on scoring/advice. Larger adjacent apps differentiate with persistence and workflow: Flaired emphasizes learned taste/profile and wardrobe context; Thea combines face/routine analysis with product matching and progress; Sumi and Complexion emphasize longitudinal skin/routine history. Celebrity lookalike products remain highly shareable and event-driven.",
-    "public_signals": "Current public App Store pages observed Thea with 13K ratings and Celebs celebrity-lookalike with 174K ratings; these are platform rating counts, not Rate My Face traction and not direct conversion evidence.",
-    "expansion_opportunity": "Build a separate Style Evolution / lookalike-inspiration surface around consented history, saved looks, feedback and shareable comparisons rather than a generic celebrity identity matcher. Reuse the Rate My Face account layer; keep actual person identification out of the core face-analysis policy."
+    "competitor_pattern": "Public ChatGPT style/beauty GPTs remain largely one-shot assistants, while adjacent 2026 styling apps increasingly compete on persistent closet/profile/history context, saved inspiration, try-on and planning workflows.",
+    "public_signals": "FreshFit markets a closet-aware stylist that learns colors/fits/silhouettes and saved inspiration; Clovy emphasizes outfit history/calendar; Flaired emphasizes selfie/body/wardrobe/style-reference context and saved/shareable try-on; Alta centers a digital closet, personalized daily outfits and planning. Celebrity-lookalike contests remain highly shareable social formats.",
+    "expansion_opportunity": "Style Evolution remains the strongest adjacent expansion: consented longitudinal style profile + saved looks/recommendations + feedback + shareable comparison/inspiration, reusing the Rate My Face account layer while avoiding real-person identification claims."
   },
   "repo_findings": {
-    "latest_schema": "OpenAPI 2.5.1; GPT instructions compressed under ChatGPT instruction limits",
-    "fixed_today": "lib/personalNetwork.ts previously reused legacy rmf_recommendations with an incompatible schema; Personal Network saved items now use rmf_personal_recommendations",
-    "fix_commit": "ba7310254421f38d47924a161740469ca1ebe246",
-    "schema_reimport_required_for_today_fix": false,
+    "latest_schema": "OpenAPI 2.5.3 live",
+    "latest_main_change": "commit 1abb9f6b717a3074c0b9d4a8a686e1d6b678b3e0 merged fail-fast handling for serverless Postgres hangs on compare/operator DB work",
+    "account_learning_pipeline": "rmf_interactions -> rmf_personal_recommendations is now producing non-zero rows",
+    "signup_credit_pr": "PR #16 merged on 2026-08-12; default bootstrap 100 credits unless disabled by RMF_SIGNUP_CREDITS=0",
+    "schema_reimport_required_for_today_changes": false,
     "documentation_drift": [
-      "DAILY_GROWTH_AGENT_CONTEXT.md still names Amazon tag ratemyface0a-20 even though commit 4d37803 intentionally migrated the dedicated Rate My Face tag to ratemyfacegpt-20",
-      "STRIPE_BILLING_CONTEXT.md says deployed OpenAPI v2.5.0 while repo/live schema is v2.5.1"
+      "DAILY_GROWTH_AGENT_CONTEXT.md still names Amazon tag ratemyface0a-20 although live product route/health use ratemyfacegpt-20",
+      "STRIPE_BILLING_CONTEXT.md contains mixed v2.5.0/v2.5.3 wording; live OpenAPI is v2.5.3"
     ]
   },
   "next_actions": [
-    "Approve or reject PR #16's signup/founder credit policy before merge; current branch default is 100 free signup credits, which changes monetization/activation behavior",
-    "Run one authenticated Custom GPT transcript: getEntitlements -> updatePersonalNetwork(update_profile harmless test value) -> getPersonalNetwork(profile); observe credits_required rather than bypassing the gate if current main balance is zero",
-    "Complete one user-approved Stripe credit Checkout and verify webhook event -> rmf_stripe_events -> rmf_credit_accounts/rmf_credit_ledger -> getEntitlements -> paid Action consumption before calling payment closure healthy",
-    "Design RLS policies for the nine core memory/billing tables before enabling RLS; do not execute blanket ENABLE ROW LEVEL SECURITY without preserving server-side access",
-    "Add first-party telemetry for searchProduct success, paid Action attempts/402s, checkout starts, verified grants, paid Action consumption and returning authenticated users",
+    "Add first-party cohort/event telemetry for new OAuth account, searchProduct success, persistence Action success/402, checkout start, verified credit grant, paid Action consumption and 7-day return before interpreting the bootstrap A/B",
+    "Complete one user-approved Stripe credit Checkout and verify Checkout Session -> signed webhook -> rmf_stripe_events -> purchase ledger/lifetime_purchased -> getEntitlements -> paid Action consumption",
+    "Run one manual Custom GPT transcript covering explicit remember/save and a new-chat preference read; direct GPT runtime cannot be executed through Scheduled Tasks",
+    "Monitor compare/operator DB routes after fail-fast commit 1abb9f6 for recurrence of timeout errors",
+    "Review Supabase advisor no-policy RLS findings for server/ops tables and enable leaked-password protection if compatible with the chosen auth model",
     "Provide the smallest ChatGPT GPT usage screenshot/export and Amazon Associates summary screenshot/export to establish traffic and affiliate baselines",
-    "Align DAILY_GROWTH_AGENT_CONTEXT.md to the intentionally migrated Amazon tag ratemyfacegpt-20 and STRIPE_BILLING_CONTEXT.md to OpenAPI v2.5.1",
-    "Do not add another Custom GPT Action until telemetry supports a server-backed capability native ChatGPT cannot adequately supply"
+    "Align DAILY_GROWTH_AGENT_CONTEXT.md Amazon tag and STRIPE_BILLING_CONTEXT.md version wording with live v2.5.3",
+    "Do not add another Custom GPT Action until evidence supports a server-backed capability that native ChatGPT cannot adequately supply"
   ],
   "daily_reports": [
     {
@@ -95,7 +109,11 @@
     },
     {
       "date": "2026-08-12",
-      "summary": "Live closure review found production auth/database/Stripe secret/credit price/webhook configuration healthy, but zero Stripe Checkout Sessions and zero credit-ledger activity. Fixed and deployed a latent Personal Network recommendation-table collision. Public research supports longitudinal personalization/history and shareable comparison over one-shot face scoring. Critical remaining security issue: nine core product/billing tables have RLS disabled. PR #16 proposing 100 free signup credits remains unmerged pending explicit product approval."
+      "summary": "Production auth/database/Stripe configuration was healthy but purchase closure remained absent. Personal Network recommendation-table collision was fixed and bootstrap/founder credits were merged."
+    },
+    {
+      "date": "2026-08-13",
+      "summary": "Account Learning is now materially active: 1 profile, 2 interactions, 2 personal recommendations and 8 metered credits consumed from a 100-credit bootstrap, leaving 92. Compare TEST persisted 1 job/result while public Compare remains disabled. Stripe still has zero Checkout Sessions and lifetime purchased credits remain 0, so monetization closure is not yet proven. RLS is now enabled across listed public tables; remaining security advisor findings concern server/ops tables without policies and leaked-password protection. Latest DB fail-fast deployment is READY with no runtime errors observed in the first 10 minutes."
     }
   ]
 }
