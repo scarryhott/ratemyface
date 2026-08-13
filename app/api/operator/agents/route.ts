@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           sql`select count(*)::int as total from rmf_agent_approvals where status='pending'`,
           sql`select count(*)::int as total from rmf_agent_runs where created_at >= now() - interval '7 days'`,
           sql`
-            select id, source, kind, status, requested_authority, created_at, completed_at
+            select id, source, kind, status, requested_authority, attempt_count, fail_reason, created_at, completed_at
             from rmf_agent_signals
             order by created_at desc
             limit 15
