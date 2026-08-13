@@ -1,7 +1,7 @@
 /**
  * Structural + (optional) live isolation proofs for social provider OAuth RLS.
  *
- * Always runs: asserts migration SQL + feature gate stay not_configured / no scrape.
+ * Always runs: asserts migration SQL + Instagram/LinkedIn stay not_configured / no scrape.
  * With RMF_RLS_TEST_DATABASE_URL (or localhost POSTGRES_URL): proves own-row
  * SELECT, cross-user DENY, anon DENY, server ALLOW.
  *
@@ -97,10 +97,8 @@ describe("rmf provider connections OAuth migration (policy matrix)", () => {
   });
 });
 
-describe("social provider OAuth gate stays not_configured", () => {
-  it("SOCIAL_PROVIDER_OAUTH.enabled is false and credentials absent", () => {
-    assert.equal(SOCIAL_PROVIDER_OAUTH.enabled, false);
-    assert.equal(SOCIAL_PROVIDER_OAUTH.status, "not_configured");
+describe("social provider OAuth gate", () => {
+  it("instagram stays not_configured; scraping stays false", () => {
     assert.equal(SOCIAL_PROVIDER_OAUTH.scraping, false);
     assert.deepEqual([...SOCIAL_PROVIDER_OAUTH.providers], [
       "instagram",
@@ -108,23 +106,24 @@ describe("social provider OAuth gate stays not_configured", () => {
       "tiktok"
     ]);
     assert.equal(socialProviderCredentialsConfigured("instagram"), false);
-    const stub = socialProviderNotConfiguredResponse(501);
+    assert.equal(socialProviderCredentialsConfigured("linkedin"), false);
+    const stub = socialProviderNotConfiguredResponse(501, "instagram");
     assert.equal(stub.status, 501);
     assert.equal(stub.body.error, "not_configured");
   });
 
-  it("health route reports social_providers via gate constant", () => {
+  it("health route reports social_providers via gate helpers", () => {
     const health = readFileSync(HEALTH, "utf8");
     assert.match(health, /social_providers/);
-    assert.match(health, /NO LIVE OAUTH/);
+    assert.match(health, /configured_providers/);
     assert.match(health, /enabled:\s*SOCIAL_PROVIDER_OAUTH\.enabled/);
     assert.match(health, /from ["'].*providerConnections["']/);
   });
 
-  it("connect stub returns not_configured path", () => {
+  it("connect keeps not_configured path for unwired providers", () => {
     const connect = readFileSync(CONNECT, "utf8");
-    assert.match(connect, /socialProviderNotConfiguredResponse\(501\)/);
-    assert.match(connect, /Never scrapes|not_configured/);
+    assert.match(connect, /socialProviderNotConfiguredResponse\(501/);
+    assert.match(connect, /not_configured|tiktokAuthorizeUrl/);
   });
 });
 

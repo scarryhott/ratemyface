@@ -172,11 +172,12 @@ export type DashboardV2 = {
   };
   social_providers: {
     status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
-    enabled: false;
-    oauth_ready: false;
+    enabled: boolean;
+    oauth_ready: boolean;
     scraping: false;
     auth_mode: string;
     planned: string[];
+    configured_providers: string[];
     connection_rows: MetricValue;
     connected: MetricValue;
     revoked: MetricValue;
@@ -325,12 +326,13 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
       action_path: APPEARANCE_AGENT.action_path
     },
     social_providers: {
-      status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
+      status: "UNAVAILABLE",
       enabled: SOCIAL_PROVIDER_OAUTH.enabled,
-      oauth_ready: false,
+      oauth_ready: SOCIAL_PROVIDER_OAUTH.enabled,
       scraping: SOCIAL_PROVIDER_OAUTH.scraping,
       auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
       planned: [...SOCIAL_PROVIDER_OAUTH.providers],
+      configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers,
       connection_rows: unavailable("Database not configured"),
       connected: unavailable("Database not configured"),
       revoked: unavailable("Database not configured"),
@@ -543,11 +545,11 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       `;
       socialConnections = metric(
         asNumber(rows[0]?.total),
-        "provider connection rows (expect 0 — OAuth not configured)"
+        "provider connection rows (live count; 0 if none)"
       );
       socialConnected = metric(
         asNumber(rows[0]?.connected),
-        "status=connected (expect 0 until OAuth secrets exist)"
+        "status=connected (TikTok OAuth when secrets exist)"
       );
       socialRevoked = metric(asNumber(rows[0]?.revoked), "status=revoked rows");
     }
@@ -807,12 +809,15 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         action_path: APPEARANCE_AGENT.action_path
       },
       social_providers: {
-        status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
+        status: SOCIAL_PROVIDER_OAUTH.enabled
+          ? "LIVE"
+          : "NOT_CONFIGURED",
         enabled: SOCIAL_PROVIDER_OAUTH.enabled,
-        oauth_ready: false,
+        oauth_ready: SOCIAL_PROVIDER_OAUTH.enabled,
         scraping: SOCIAL_PROVIDER_OAUTH.scraping,
         auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
         planned: [...SOCIAL_PROVIDER_OAUTH.providers],
+        configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers,
         connection_rows: socialConnections,
         connected: hasProviders
           ? socialConnected

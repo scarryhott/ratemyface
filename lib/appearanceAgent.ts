@@ -48,7 +48,7 @@ export const APPEARANCE_AGENT = {
   /** Operator dashboard status badge — PAID, not LIVE. */
   dashboard_status: "PAID" as const,
   note: "Paid appearancePlan / appearanceCheckin Actions (OAuth + 1 credit, same unit as Personal Network and Compare). Honest 90-day professional-image plan/check-ins from Account Learning + Compare history. Missing required history returns 400 — never invented coaching or medical claims. Not a free public product and not a LIVE unlimited-coaching claim.",
-  gate: "Paid OpenAPI Actions at POST /api/appearance (appearancePlan) and POST /api/appearance/plans (appearanceCheckin). Unauthenticated callers get 401. Requires consent_appearance=true and Account Learning + Compare history (4xx if missing). Cost is PERSONAL_ACTION_COST (1). Social stays not_configured.",
+  gate: "Paid OpenAPI Actions at POST /api/appearance (appearancePlan) and POST /api/appearance/plans (appearanceCheckin). Unauthenticated callers get 401. Requires consent_appearance=true and Account Learning + Compare history (4xx if missing). Cost is PERSONAL_ACTION_COST (1). Social OAuth is user-authorized only (no scraping).",
   tables: ["rmf_appearance_plans", "rmf_appearance_checkins"] as const,
   action_path: "/api/appearance" as const,
   checkin_path: "/api/appearance/plans" as const,

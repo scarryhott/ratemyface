@@ -176,11 +176,12 @@ export function AppearanceAgentSection({ data }: { data: AppearanceAgentControl 
 
 type SocialProvidersControl = {
   status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
-  enabled: false;
-  oauth_ready: false;
+  enabled: boolean;
+  oauth_ready: boolean;
   scraping: false;
   auth_mode: string;
   planned: string[];
+  configured_providers?: string[];
   connection_rows: MetricValue;
   connected: MetricValue;
   revoked: MetricValue;
@@ -218,8 +219,11 @@ export function SocialProvidersSection({ data }: { data: SocialProvidersControl 
           </span>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          {data.note} Planned: {data.planned.join(", ")}. Counts are live empties (expect 0) or
-          Unavailable — no fake metrics. No live social OAuth until secrets are configured.
+          {data.note} Planned: {data.planned.join(", ")}.
+          {data.configured_providers?.length
+            ? ` Wired: ${data.configured_providers.join(", ")}.`
+            : " No provider secrets wired yet."}{" "}
+          Counts are live table rows (0 if empty) or Unavailable — no fake metrics. Never scrape.
         </p>
         <section style={grid4}>
           <MetricCard label="Connection rows" metric={data.connection_rows} />
@@ -232,7 +236,7 @@ export function SocialProvidersSection({ data }: { data: SocialProvidersControl 
             <div style={{ fontSize: 18, fontWeight: 750, margin: "8px 0", color: "#111" }}>
               {data.auth_mode}
             </div>
-            <div className="muted">stubs: /api/providers · connect · disconnect</div>
+            <div className="muted">/api/providers · connect · disconnect · tiktok/callback</div>
           </div>
         </section>
       </section>

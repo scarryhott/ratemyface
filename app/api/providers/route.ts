@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { databaseConfigured } from "../../../lib/db";
-import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
+import {
+  databaseConfigured,
+  isDatabaseTimeoutError,
+  PROVIDER_OAUTH_TIMEOUT_MS,
+  withDatabaseTimeout
+} from "../../../lib/db";
+import {
+  SOCIAL_PROVIDER_OAUTH,
+  socialProviderCredentialsConfigured
+} from "../../../lib/providerConnections";
 import { listProvidersCatalog } from "../../../lib/providerConnectionsDb";
 import { currentOAuthUser } from "../../../lib/supabaseAuth";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 /**
  * List social provider connection catalog + stored rows.
- * OAuth launch stays not_configured; never returns raw token secrets.
+ * Never returns raw token secrets. Scraping stays false.
  */
 export async function GET(req: NextRequest) {
   const user = await currentOAuthUser(req);
@@ -24,26 +33,41 @@ export async function GET(req: NextRequest) {
         status: SOCIAL_PROVIDER_OAUTH.status,
         database_configured: false,
         planned: [...SOCIAL_PROVIDER_OAUTH.providers],
+        configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers,
         connections: [],
-        catalog: SOCIAL_PROVIDER_OAUTH.providers.map((provider) => ({
-          provider,
-          status: SOCIAL_PROVIDER_OAUTH.status,
-          oauth_ready: false,
-          connection: null
-        })),
+        catalog: SOCIAL_PROVIDER_OAUTH.providers.map((provider) => {
+          const oauth_ready = socialProviderCredentialsConfigured(provider);
+          return {
+            provider,
+            status: oauth_ready ? "not_connected" : "not_configured",
+            oauth_ready,
+            connection: null
+          };
+        }),
+        scraping: SOCIAL_PROVIDER_OAUTH.scraping,
         note: SOCIAL_PROVIDER_OAUTH.note
       },
       { status: 200 }
     );
   }
 
-  const data = await listProvidersCatalog(user.id);
-  return NextResponse.json({
-    ok: true,
-    database_configured: true,
-    ...data.framework,
-    planned: data.planned,
-    connections: data.connections,
-    catalog: data.catalog
-  });
+  try {
+    const data = await withDatabaseTimeout(
+      () => listProvidersCatalog(user.id),
+      PROVIDER_OAUTH_TIMEOUT_MS
+    );
+    return NextResponse.json({
+      ok: true,
+      database_configured: true,
+      ...data.framework,
+      planned: data.planned,
+      connections: data.connections,
+      catalog: data.catalog
+    });
+  } catch (error) {
+    if (isDatabaseTimeoutError(error)) {
+      return NextResponse.json({ ok: false, error: "database_timeout" }, { status: 504 });
+    }
+    throw error;
+  }
 }

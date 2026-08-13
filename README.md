@@ -17,18 +17,19 @@ The backend never invents ASINs.
 - `POST /api/product` — authenticated recommendation-link endpoint.
 - `GET /api/openapi` — dynamic OpenAPI 3.1 schema for the Custom GPT Action.
 - `GET /privacy` — public privacy policy for the GPT Action.
-- `GET /api/providers` — social provider connection catalog (OAuth skeleton; see `SOCIAL_PROVIDERS.md`).
-- `POST /api/providers/connect` — returns `501 not_configured` until provider credentials exist.
-- `POST /api/providers/disconnect` — revoke stub / soft-revoke when a row exists.
+- `GET /api/providers` — social provider connection catalog (OAuth required; see `SOCIAL_PROVIDERS.md`).
+- `POST /api/providers/connect` — TikTok returns an authorize URL when env is set; Instagram/LinkedIn stay `501 not_configured`.
+- `GET|POST /api/providers/tiktok/callback` — TikTok Login Kit callback; stores encrypted `token_ref` only.
+- `POST /api/providers/disconnect` — soft-revoke a stored connection row.
 - `GET|POST /api/compare` — paid **compareMeToMe** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_compare=true` + real before/after image refs. Unauthenticated callers get `401 oauth_required` (not a free anonymous compare). Vision is limited; missing refs return 400 rather than fake analysis.
 - `GET|POST /api/compare/jobs` — public jobs stub (`503`).
 - `GET|POST /api/compare/test` — **authenticated OAuth / owner / operator TEST only** (not an OpenAPI Action). Costs **1 credit**. History-placeholder analysis from Account Learning. Not a substitute for the paid Action.
 - `GET|POST /api/appearance` — paid **appearancePlan** OpenAPI Action. OAuth + 1 credit (same unit as Personal Network) + `consent_appearance=true` + Account Learning and Compare history. Unauthenticated callers get `401 oauth_required`. Missing history returns 400 rather than invented coaching.
 - `GET|POST /api/appearance/plans` — paid **appearanceCheckin** OpenAPI Action on POST (same 1-credit unit). GET lists the caller’s plans (OAuth). Unauthenticated callers get `401`.
 
-## Social providers (OAuth skeleton)
+## Social providers (user-authorized OAuth)
 
-Planned: Instagram, LinkedIn, TikTok — **user-authorized OAuth only**. No scraping. No live connect until secrets are configured. Details: [`SOCIAL_PROVIDERS.md`](./SOCIAL_PROVIDERS.md).
+Planned: Instagram, LinkedIn, TikTok — **user-authorized OAuth only**. No scraping. TikTok connect is wired when `TIKTOK_OAUTH_CLIENT_KEY` and `TIKTOK_OAUTH_CLIENT_SECRET` are set. Instagram and LinkedIn stay `501` until their env exists. Details: [`SOCIAL_PROVIDERS.md`](./SOCIAL_PROVIDERS.md).
 
 ## Appearance Agent (PAID)
 

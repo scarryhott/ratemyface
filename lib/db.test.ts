@@ -12,6 +12,7 @@ import {
   COMPARE_ACTION_TIMEOUT_MS,
   COMPARE_TEST_DB_TIMEOUT_MS,
   HEARTBEAT_DB_TIMEOUT_MS,
+  PROVIDER_OAUTH_TIMEOUT_MS,
   DatabaseTimeoutError,
   dbClientGeneration,
   isDatabaseTimeoutError,
@@ -146,6 +147,21 @@ describe("compare POST hang regression (no live DB)", () => {
     assert.ok(HEARTBEAT_DB_TIMEOUT_MS < 10_000);
     const dbSource = readFileSync(join(ROOT, "lib/db.ts"), "utf8");
     assert.match(dbSource, /HEARTBEAT_DB_TIMEOUT_MS/);
+  });
+
+  it("social provider connect/disconnect/callback bound DB work under 300s", () => {
+    const connect = readFileSync(join(ROOT, "app/api/providers/connect/route.ts"), "utf8");
+    const disconnect = readFileSync(join(ROOT, "app/api/providers/disconnect/route.ts"), "utf8");
+    const callback = readFileSync(join(ROOT, "app/api/providers/tiktok/callback/route.ts"), "utf8");
+    const list = readFileSync(join(ROOT, "app/api/providers/route.ts"), "utf8");
+    assert.match(disconnect, /withDatabaseTimeout/);
+    assert.match(callback, /withDatabaseTimeout/);
+    assert.match(list, /withDatabaseTimeout/);
+    assert.match(disconnect, /database_timeout/);
+    assert.match(list, /status:\s*504/);
+    assert.ok(PROVIDER_OAUTH_TIMEOUT_MS <= 15_000);
+    assert.ok(PROVIDER_OAUTH_TIMEOUT_MS < 30_000);
+    assert.equal(connect.includes("consumeCredits"), false);
   });
 
   it("GET /api/operator/agents uses the same bounded DB wrapper", () => {

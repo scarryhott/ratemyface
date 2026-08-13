@@ -58,11 +58,12 @@ export async function GET() {
       public_unauthenticated: "401 oauth_required"
     },
     social_providers: {
-      // NO LIVE OAUTH until secrets configured — skeleton / stubs only.
+      // enabled only when at least one provider's secrets exist. Never scrape.
       enabled: SOCIAL_PROVIDER_OAUTH.enabled,
       status: SOCIAL_PROVIDER_OAUTH.status,
       note: SOCIAL_PROVIDER_OAUTH.note,
       providers: [...SOCIAL_PROVIDER_OAUTH.providers],
+      configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers,
       auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
       scraping: SOCIAL_PROVIDER_OAUTH.scraping,
       table: SOCIAL_PROVIDER_OAUTH.table

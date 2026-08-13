@@ -97,10 +97,10 @@ describe("feature gates stay off", () => {
     assert.equal(compareTestLinkEnabled(), process.env.RMF_COMPARE_TEST_LINK === "1");
   });
 
-  it("Appearance Agent is a paid Action; Social stays disabled", () => {
+  it("Appearance Agent is a paid Action; Social does not scrape", () => {
     assert.equal(APPEARANCE_AGENT.enabled, true);
     assert.equal(APPEARANCE_AGENT.status, "paid");
-    assert.equal(SOCIAL_PROVIDER_OAUTH.enabled, false);
+    assert.equal(SOCIAL_PROVIDER_OAUTH.scraping, false);
   });
 });
 

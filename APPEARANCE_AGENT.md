@@ -21,7 +21,7 @@
 4. Compare Me To Me history (a compare job on the account)
 5. Credits (1) on the existing Stripe ledger
 
-Missing required history returns `400` — no invented coaching or medical claims. Social stays `not_configured`. Amazon / `searchProduct` is untouched.
+Missing required history returns `400` — no invented coaching or medical claims. Social OAuth is user-authorized only (no scraping). Amazon / `searchProduct` is untouched.
 
 ## Schema
 
@@ -61,7 +61,7 @@ Agent Console / `agentBusinessLoop` must not invent LIVE coaching.
 ## Monitor notes
 
 - Re-import `/api/openapi` (2.5.6). Do **not** paste `GPT_INSTRUCTIONS.md`.
-- Do not enable social scraping; social stays `not_configured`.
+- Do not enable social scraping; social OAuth is user-authorized only.
 - Do not change Amazon / `searchProduct` / affiliate.
 - Paid plan/check-in ops meter Stripe RMF product credits at 1 (`PERSONAL_ACTION_COST`).
 - Harness stage: **admitted** as a paid Action (`operator/HARNESS.md`).
