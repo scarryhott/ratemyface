@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { entitlementsCheckoutFields } from "./stripeBilling.ts";
+import { entitlementsCheckoutFields } from "./entitlementsCheckout.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -129,6 +129,8 @@ describe("entitlementsCheckoutFields", () => {
   it("is wired into the entitlements route", () => {
     const route = read("app/api/billing/entitlements/route.ts");
     assert.match(route, /entitlementsCheckoutFields/);
-    assert.match(route, /checkout_action/);
+    assert.match(route, /from \"\.\.\/\.\.\/\.\.\/\.\.\/lib\/entitlementsCheckout\"/);
+    const helper = read("lib/entitlementsCheckout.ts");
+    assert.match(helper, /checkout_action: \"createCreditCheckoutSession\"/);
   });
 });

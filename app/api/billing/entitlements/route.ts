@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { databaseConfigured } from "../../../../lib/db";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
+import { entitlementsCheckoutFields } from "../../../../lib/entitlementsCheckout";
 import {
   MEMORY_CONTEXT_COST,
   creditsPerPack,
   ensureSignupCreditGrant,
-  entitlementsCheckoutFields,
   getEntitlements,
   signupCredits,
   stripeCreditsPriceConfigured,
