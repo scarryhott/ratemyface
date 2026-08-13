@@ -6,8 +6,9 @@
 --   authenticated + sub=UserA → UserB rows empty
 --   anon → permission denied
 --   postgres/table owner → full read/write
---   App health: social_providers.enabled=false, status=not_configured
---   Connect stub: POST /api/providers/connect → 501 not_configured
+--   App health: social_providers.enabled true only when a provider's secrets exist; scraping=false
+--   Instagram/LinkedIn connect: POST /api/providers/connect → 501 not_configured
+--   TikTok connect: authorize URL when TIKTOK_OAUTH_CLIENT_KEY + TIKTOK_OAUTH_CLIENT_SECRET are set
 
 -- Example seed (server role):
 -- insert into rmf_provider_connections (user_id, provider, status, token_ref) values

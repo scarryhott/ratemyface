@@ -2,6 +2,7 @@ import { db, databaseConfigured, newSchemaSlot, runOncePerDbClient } from "./db"
 import {
   PLANNED_SOCIAL_PROVIDERS,
   SOCIAL_PROVIDER_OAUTH,
+  socialProviderCredentialsConfigured,
   type PlannedSocialProvider
 } from "./providerConnections";
 
@@ -45,7 +46,7 @@ export type ProviderConnectionPublic = {
   connected_at: string | null;
   revoked_at: string | null;
   updated_at: string | null;
-  /** Always false in public payloads — never expose token_ref / secrets. */
+  /** Boolean only — never expose token_ref / secrets. */
   has_token_ref: boolean;
 };
 
@@ -91,18 +92,19 @@ export async function listProviderConnections(
  */
 export async function listProvidersCatalog(userId: string): Promise<{
   framework: {
-    enabled: false;
+    enabled: boolean;
     status: string;
     auth_mode: string;
     scraping: false;
     note: string;
+    configured_providers: PlannedSocialProvider[];
   };
   planned: PlannedSocialProvider[];
   connections: ProviderConnectionPublic[];
   catalog: Array<{
     provider: PlannedSocialProvider;
     status: string;
-    oauth_ready: false;
+    oauth_ready: boolean;
     connection: ProviderConnectionPublic | null;
   }>;
 }> {
@@ -112,10 +114,11 @@ export async function listProvidersCatalog(userId: string): Promise<{
   const byProvider = new Map(connections.map((c) => [c.provider, c]));
   const catalog = PLANNED_SOCIAL_PROVIDERS.map((provider) => {
     const connection = byProvider.get(provider) || null;
+    const oauth_ready = socialProviderCredentialsConfigured(provider);
     return {
       provider,
-      status: connection?.status || SOCIAL_PROVIDER_OAUTH.status,
-      oauth_ready: false as const,
+      status: connection?.status || (oauth_ready ? "not_connected" : "not_configured"),
+      oauth_ready,
       connection
     };
   });
@@ -125,12 +128,78 @@ export async function listProvidersCatalog(userId: string): Promise<{
       status: SOCIAL_PROVIDER_OAUTH.status,
       auth_mode: SOCIAL_PROVIDER_OAUTH.auth_mode,
       scraping: SOCIAL_PROVIDER_OAUTH.scraping,
-      note: SOCIAL_PROVIDER_OAUTH.note
+      note: SOCIAL_PROVIDER_OAUTH.note,
+      configured_providers: SOCIAL_PROVIDER_OAUTH.configured_providers
     },
     planned: [...PLANNED_SOCIAL_PROVIDERS],
     connections,
     catalog
   };
+}
+
+export type UpsertProviderConnectionInput = {
+  userId: string;
+  provider: PlannedSocialProvider;
+  tokenRef: string;
+  tokenExpiresAt: Date | null;
+  externalSubject: string | null;
+  scopes: string[];
+};
+
+/** Persist a connected OAuth row. Stores token_ref only — never returns raw tokens. */
+export async function upsertConnectedProvider(
+  input: UpsertProviderConnectionInput
+): Promise<ProviderConnectionPublic> {
+  await ensureProviderConnectionsSchema();
+  const sql = db();
+  const scopes = input.scopes;
+  const rows = await sql`
+    insert into rmf_provider_connections (
+      user_id,
+      provider,
+      status,
+      scopes,
+      external_subject,
+      profile_signals,
+      token_ref,
+      token_expires_at,
+      connected_at,
+      revoked_at,
+      updated_at
+    ) values (
+      ${input.userId},
+      ${input.provider},
+      'connected',
+      ${scopes},
+      ${input.externalSubject},
+      '{}'::jsonb,
+      ${input.tokenRef},
+      ${input.tokenExpiresAt},
+      now(),
+      null,
+      now()
+    )
+    on conflict (user_id, provider) do update set
+      status = 'connected',
+      scopes = excluded.scopes,
+      external_subject = excluded.external_subject,
+      profile_signals = '{}'::jsonb,
+      token_ref = excluded.token_ref,
+      token_expires_at = excluded.token_expires_at,
+      connected_at = now(),
+      revoked_at = null,
+      updated_at = now()
+    returning
+      provider,
+      status,
+      scopes,
+      external_subject,
+      token_ref,
+      connected_at,
+      revoked_at,
+      updated_at
+  `;
+  return mapPublicRow(rows[0] as Record<string, unknown>);
 }
 
 /** Soft-revoke a connection row (server path). Used when OAuth is later wired. */

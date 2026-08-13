@@ -240,19 +240,24 @@ export function loadFeatureBacklogSpec(): FeatureBacklogFile {
 export function inspectRepoEvidence(overrides: Partial<RepoEvidence> = {}): RepoEvidence {
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || null;
   const production_url = host ? `https://${String(host).replace(/^https?:\/\//, "")}` : null;
+  const socialCredentials = Boolean(
+    (process.env.TIKTOK_OAUTH_CLIENT_KEY?.trim() && process.env.TIKTOK_OAUTH_CLIENT_SECRET?.trim()) ||
+    (process.env.INSTAGRAM_OAUTH_CLIENT_ID?.trim() && process.env.INSTAGRAM_OAUTH_CLIENT_SECRET?.trim()) ||
+    (process.env.LINKEDIN_OAUTH_CLIENT_ID?.trim() && process.env.LINKEDIN_OAUTH_CLIENT_SECRET?.trim())
+  );
   const flags = {
     // Keep aligned with COMPARE_ME_TO_ME / APPEARANCE_AGENT / SOCIAL_PROVIDER_OAUTH.
     account_learning: true,
     compare_me_to_me: true,
     appearance_agent: true,
-    social_oauth: false,
+    social_oauth: socialCredentials,
     ...(overrides.flags || {})
   };
   return {
     inspected_at: overrides.inspected_at || new Date().toISOString(),
     openapi_operations: overrides.openapi_operations || [...KNOWN_OPENAPI_OPERATIONS],
     flags,
-    social_credentials_configured: overrides.social_credentials_configured ?? false,
+    social_credentials_configured: overrides.social_credentials_configured ?? socialCredentials,
     github_write_configured: overrides.github_write_configured ?? Boolean(process.env.GITHUB_OPERATOR_TOKEN),
     production_url: overrides.production_url === undefined ? production_url : overrides.production_url,
     max_authority: overrides.max_authority ?? Number(process.env.RMF_OPERATOR_MAX_AUTHORITY || 1)

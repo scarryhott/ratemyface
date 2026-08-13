@@ -289,15 +289,27 @@ describe("decideManagerialAction", () => {
   });
 
   it("Social OAuth stays blocked on missing secrets and is not invented-complete", () => {
-    assert.equal(SOCIAL_PROVIDER_OAUTH.enabled, false);
-    const items = deriveBacklog(
-      evidence(),
-      [shippedReceipt("account_learning"), shippedReceipt("compare_me_to_me"), shippedReceipt("appearance_agent")],
-      liveHealth
-    );
-    const social = items.find((i) => i.id === "social_oauth");
-    assert.equal(social?.loop_status, "blocked");
-    assert.equal(social?.blocked_on, "missing_secret");
+    const previousKey = process.env.TIKTOK_OAUTH_CLIENT_KEY;
+    const previousSecret = process.env.TIKTOK_OAUTH_CLIENT_SECRET;
+    delete process.env.TIKTOK_OAUTH_CLIENT_KEY;
+    delete process.env.TIKTOK_OAUTH_CLIENT_SECRET;
+    try {
+      assert.equal(SOCIAL_PROVIDER_OAUTH.scraping, false);
+      assert.equal(SOCIAL_PROVIDER_OAUTH.enabled, false);
+      const items = deriveBacklog(
+        evidence(),
+        [shippedReceipt("account_learning"), shippedReceipt("compare_me_to_me"), shippedReceipt("appearance_agent")],
+        liveHealth
+      );
+      const social = items.find((i) => i.id === "social_oauth");
+      assert.equal(social?.loop_status, "blocked");
+      assert.equal(social?.blocked_on, "missing_secret");
+    } finally {
+      if (previousKey === undefined) delete process.env.TIKTOK_OAUTH_CLIENT_KEY;
+      else process.env.TIKTOK_OAUTH_CLIENT_KEY = previousKey;
+      if (previousSecret === undefined) delete process.env.TIKTOK_OAUTH_CLIENT_SECRET;
+      else process.env.TIKTOK_OAUTH_CLIENT_SECRET = previousSecret;
+    }
   });
 });
 

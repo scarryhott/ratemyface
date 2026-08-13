@@ -18,6 +18,8 @@ export const COMPARE_ACTION_TIMEOUT_MS = 20_000;
 export const APPEARANCE_ACTION_TIMEOUT_MS = 12_000;
 /** Heartbeat enqueue-only budget — must return 200/202 in under 10s. */
 export const HEARTBEAT_DB_TIMEOUT_MS = 8_000;
+/** Social provider connect/disconnect/callback DB budget (far below 300s). */
+export const PROVIDER_OAUTH_TIMEOUT_MS = 12_000;
 
 export class DatabaseTimeoutError extends Error {
   readonly timeoutMs: number;

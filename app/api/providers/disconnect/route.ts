@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { databaseConfigured } from "../../../../lib/db";
+import {
+  databaseConfigured,
+  isDatabaseTimeoutError,
+  PROVIDER_OAUTH_TIMEOUT_MS,
+  withDatabaseTimeout
+} from "../../../../lib/db";
 import {
   isPlannedSocialProvider,
   socialProviderCredentialsConfigured,
@@ -9,11 +14,12 @@ import { revokeProviderConnection } from "../../../../lib/providerConnectionsDb"
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 /**
- * Disconnect / revoke a provider connection — skeleton.
- * While OAuth credentials are absent, returns 501 not_configured
- * unless a stored row exists (then soft-revokes without exposing secrets).
+ * Disconnect / revoke a provider connection.
+ * Soft-revokes the stored row (clears token_ref). Never logs raw tokens.
+ * Unconfigured providers stay 501 unless a stored row exists.
  */
 export async function POST(req: NextRequest) {
   const user = await currentOAuthUser(req);
@@ -36,28 +42,73 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Live OAuth not launched — prefer clear not_configured when no credentials.
-  if (!socialProviderCredentialsConfigured(provider)) {
+  const configured = socialProviderCredentialsConfigured(provider);
+
+  if (!configured) {
     if (!databaseConfigured()) {
-      const { status, body: stub } = socialProviderNotConfiguredResponse(501);
+      const { status, body: stub } = socialProviderNotConfiguredResponse(501, provider);
       return NextResponse.json(
         { ...stub, provider, operation: "disconnect" },
         { status }
       );
     }
 
-    const revoked = await revokeProviderConnection(user.id, provider);
+    try {
+      const revoked = await withDatabaseTimeout(
+        () => revokeProviderConnection(user.id, provider),
+        PROVIDER_OAUTH_TIMEOUT_MS
+      );
+      if (!revoked) {
+        const { status, body: stub } = socialProviderNotConfiguredResponse(501, provider);
+        return NextResponse.json(
+          {
+            ...stub,
+            provider,
+            operation: "disconnect",
+            message:
+              "Social provider OAuth is not configured and no connection row exists to revoke."
+          },
+          { status }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        operation: "disconnect",
+        provider,
+        connection: revoked,
+        note: "Soft-revoked stored row. Live OAuth remains not_configured for this provider."
+      });
+    } catch (error) {
+      if (isDatabaseTimeoutError(error)) {
+        return NextResponse.json({ ok: false, error: "database_timeout" }, { status: 504 });
+      }
+      throw error;
+    }
+  }
+
+  if (!databaseConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: "database_not_configured", provider, operation: "disconnect" },
+      { status: 503 }
+    );
+  }
+
+  try {
+    const revoked = await withDatabaseTimeout(
+      () => revokeProviderConnection(user.id, provider),
+      PROVIDER_OAUTH_TIMEOUT_MS
+    );
     if (!revoked) {
-      const { status, body: stub } = socialProviderNotConfiguredResponse(501);
       return NextResponse.json(
         {
-          ...stub,
+          ok: false,
+          error: "not_connected",
           provider,
           operation: "disconnect",
-          message:
-            "Social provider OAuth is not configured and no connection row exists to revoke."
+          message: "No connection row exists to revoke."
         },
-        { status }
+        { status: 404 }
       );
     }
 
@@ -66,17 +117,12 @@ export async function POST(req: NextRequest) {
       operation: "disconnect",
       provider,
       connection: revoked,
-      note: "Soft-revoked stored row. Live OAuth remains not_configured until credentials exist."
+      note: "Soft-revoked stored row. Encrypted token_ref cleared. No scraping."
     });
+  } catch (error) {
+    if (isDatabaseTimeoutError(error)) {
+      return NextResponse.json({ ok: false, error: "database_timeout" }, { status: 504 });
+    }
+    throw error;
   }
-
-  return NextResponse.json(
-    {
-      ok: false,
-      error: "not_configured",
-      provider,
-      message: "OAuth disconnect not fully implemented for this provider yet."
-    },
-    { status: 501 }
-  );
 }
