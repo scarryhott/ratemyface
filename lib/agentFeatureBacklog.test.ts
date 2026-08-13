@@ -212,6 +212,9 @@ describe("decideManagerialAction", () => {
     assert.equal(decision.candidate?.tool, "github_implementation_dispatch");
     assert.equal(APPEARANCE_AGENT.enabled, false);
     assert.equal(COMPARE_ME_TO_ME.enabled, true);
+    assert.equal(inspectRepoEvidence().flags.appearance_agent, APPEARANCE_AGENT.enabled);
+    assert.equal(inspectRepoEvidence().flags.compare_me_to_me, COMPARE_ME_TO_ME.enabled);
+    assert.equal(inspectRepoEvidence().flags.social_oauth, SOCIAL_PROVIDER_OAUTH.enabled);
   });
 
   it("records blocked-on approval instead of observing when L2 is not admitted", () => {

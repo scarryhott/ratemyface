@@ -6,9 +6,6 @@
  * The backlog advances only when a verified production receipt is recorded.
  */
 
-import { APPEARANCE_AGENT } from "./appearanceAgent";
-import { COMPARE_ME_TO_ME } from "./compareFeature";
-import { SOCIAL_PROVIDER_OAUTH, socialProviderCredentialsConfigured } from "./providerConnections";
 import type { Authority, OperatorToolName } from "./operatorTools";
 import type { OperatorCandidate, OperatorModelPlan } from "./operatorClosure";
 
@@ -242,18 +239,18 @@ export function inspectRepoEvidence(overrides: Partial<RepoEvidence> = {}): Repo
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || null;
   const production_url = host ? `https://${String(host).replace(/^https?:\/\//, "")}` : null;
   const flags = {
+    // Keep aligned with COMPARE_ME_TO_ME / APPEARANCE_AGENT / SOCIAL_PROVIDER_OAUTH.
     account_learning: true,
-    compare_me_to_me: COMPARE_ME_TO_ME.enabled,
-    appearance_agent: APPEARANCE_AGENT.enabled,
-    social_oauth: SOCIAL_PROVIDER_OAUTH.enabled,
+    compare_me_to_me: true,
+    appearance_agent: false,
+    social_oauth: false,
     ...(overrides.flags || {})
   };
   return {
     inspected_at: overrides.inspected_at || new Date().toISOString(),
     openapi_operations: overrides.openapi_operations || [...KNOWN_OPENAPI_OPERATIONS],
     flags,
-    social_credentials_configured:
-      overrides.social_credentials_configured ?? socialProviderCredentialsConfigured(),
+    social_credentials_configured: overrides.social_credentials_configured ?? false,
     github_write_configured: overrides.github_write_configured ?? Boolean(process.env.GITHUB_OPERATOR_TOKEN),
     production_url: overrides.production_url === undefined ? production_url : overrides.production_url,
     max_authority: overrides.max_authority ?? Number(process.env.RMF_OPERATOR_MAX_AUTHORITY || 1)
@@ -457,10 +454,10 @@ export function decideManagerialAction(input: {
 }): ManagerialDecision {
   const items = deriveBacklog(input.evidence, input.receipts, input.production || null, input.spec);
   const selected = selectHighestPriorityUnfinished(items);
-  const base = {
+  const base: Pick<ManagerialDecision, "loop" | "selected_item" | "feature_progress"> = {
     loop: MANAGERIAL_LOOP,
     selected_item: selected,
-    feature_progress: false as const
+    feature_progress: false
   };
 
   if (!selected) {
