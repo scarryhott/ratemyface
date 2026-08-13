@@ -1,15 +1,16 @@
 /**
  * Compare Me To Me writers.
  *
- * Public /api/compare* stay 503 stubs. Two server-only helpers:
  * 1. maybeLinkDisabledCompareJob — opt-in RMF_COMPARE_TEST_LINK=1 queued row
  *    on Account Learning writes (source_interaction_id wiring).
- * 2. runAuthenticatedCompareTest — OAuth/owner/operator TEST path: queued →
- *    running → completed/failed, honest history placeholder result, follow-up
- *    interaction + context note. Does not flip COMPARE_ME_TO_ME.enabled.
+ * 2. runAuthenticatedCompareTest — internal history-placeholder path.
+ * 3. runAuthenticatedCompare — paid OpenAPI Action: real image refs, credits,
+ *    consent_compare, honest visual compare (vision when https URLs work).
  */
 import { asRecord, firstString } from "./accountLearningShape";
 import {
+  COMPARE_ACTION,
+  COMPARE_ACTION_COST,
   COMPARE_ME_TO_ME,
   COMPARE_TEST_ACTION,
   COMPARE_TEST_ACTION_COST,
@@ -24,34 +25,48 @@ import {
   savedItems
 } from "./personalNetwork";
 import {
+  analyzeCompareImages,
+  buildHonestCompareActionResult,
+  resolveCompareImageRefs,
+  type CompareImageRefs
+} from "./compareVision";
+import {
   buildHonestCompareTestResult,
   type CompareLearningSnapshot
 } from "./compareTestShape";
 
 export {
+  COMPARE_ACTION,
+  COMPARE_ACTION_COST,
   COMPARE_TEST_ACTION,
   COMPARE_TEST_ACTION_COST,
   compareTestLinkEnabled
 } from "./compareFeature";
 export { buildHonestCompareTestResult } from "./compareTestShape";
 export type { CompareLearningSnapshot, HonestCompareTestResult } from "./compareTestShape";
+export {
+  buildHonestCompareActionResult,
+  resolveCompareImageRefs
+} from "./compareVision";
 
 export type CompareTestLinkResult =
   | { linked: false; reason: string }
   | { linked: true; job: { id: unknown; source_interaction_id?: unknown; status?: unknown } };
 
+export type CompareJobPayload = {
+  id: number;
+  status: string;
+  source_interaction_id: number | null;
+  consent_compare: boolean;
+  consent_image_storage: boolean;
+  before_image_ref: string | null;
+  after_image_ref: string | null;
+};
+
 export type CompareTestRunResult =
   | {
       ok: true;
-      job: {
-        id: number;
-        status: string;
-        source_interaction_id: number | null;
-        consent_compare: boolean;
-        consent_image_storage: boolean;
-        before_image_ref: string | null;
-        after_image_ref: string | null;
-      };
+      job: CompareJobPayload;
       result: { id: number; job_id: number; summary: string; score: unknown; data: unknown };
       follow_up: {
         interaction: { id: number; created_at: unknown } | null;
@@ -69,7 +84,11 @@ export type CompareTestRunResult =
       error: string;
       message: string;
       job?: { id: number; status: string; error?: string | null };
+      before_image_ref?: string | null;
+      after_image_ref?: string | null;
     };
+
+export type CompareActionRunResult = CompareTestRunResult;
 
 async function compareTablesReady(): Promise<boolean> {
   if (!databaseConfigured()) return false;
@@ -222,13 +241,6 @@ export async function runAuthenticatedCompareTest(
   userId: string,
   options: { consent_compare?: boolean; consent_image_storage?: boolean } = {}
 ): Promise<CompareTestRunResult> {
-  if (COMPARE_ME_TO_ME.enabled) {
-    return {
-      ok: false,
-      error: "live_compare_not_this_path",
-      message: "Live Compare Me To Me is not this test path."
-    };
-  }
   if (!databaseConfigured()) {
     return {
       ok: false,
@@ -398,6 +410,223 @@ export async function runAuthenticatedCompareTest(
     return {
       ok: false,
       error: "compare_test_failed",
+      message,
+      job: { id: jobId, status: "failed", error: message.slice(0, 500) }
+    };
+  }
+}
+
+/**
+ * Paid Compare Me To Me Action. Caller must already have validated OAuth,
+ * credits, explicit consent_compare=true, and real before/after image refs.
+ */
+export async function runAuthenticatedCompare(
+  userId: string,
+  options: {
+    consent_compare: boolean;
+    consent_image_storage?: boolean;
+    before_image_ref: string;
+    after_image_ref: string;
+    source: CompareImageRefs["source"];
+    snapshot?: CompareLearningSnapshot;
+  }
+): Promise<CompareActionRunResult> {
+  if (options.consent_compare !== true) {
+    return {
+      ok: false,
+      error: "consent_compare_required",
+      message: "Compare Me To Me requires explicit consent_compare=true."
+    };
+  }
+  const refs = resolveCompareImageRefs({
+    body: {
+      before_image_ref: options.before_image_ref,
+      after_image_ref: options.after_image_ref
+    }
+  });
+  if (!refs.ok) {
+    return {
+      ok: false,
+      error: refs.error,
+      message: refs.message,
+      before_image_ref: refs.before_image_ref,
+      after_image_ref: refs.after_image_ref
+    };
+  }
+  if (!databaseConfigured()) {
+    return {
+      ok: false,
+      error: "database_not_configured",
+      message: "Database is not configured."
+    };
+  }
+  if (!(await compareTablesReady())) {
+    return {
+      ok: false,
+      error: "compare_schema_missing",
+      message: "rmf_compare_jobs / rmf_compare_results are not applied."
+    };
+  }
+
+  const snapshot = options.snapshot ?? (await readCompareLearningSnapshot(userId));
+  const sourceInteractionId = snapshot.latest_interaction?.id ?? null;
+  const consentImageStorage = options.consent_image_storage === true;
+  const sql = db();
+
+  const inserted = await sql`
+    insert into rmf_compare_jobs (
+      user_id, status, source_interaction_id, before_image_ref, after_image_ref,
+      consent_compare, consent_image_storage, metadata
+    )
+    values (
+      ${userId},
+      'queued',
+      ${sourceInteractionId},
+      ${refs.before_image_ref},
+      ${refs.after_image_ref},
+      true,
+      ${consentImageStorage},
+      ${sql.json({
+        action: COMPARE_ACTION,
+        image_source: options.source,
+        vision_status: COMPARE_ME_TO_ME.vision_status,
+        public_unauthenticated: false
+      } as any)}
+    )
+    returning id, status, source_interaction_id, consent_compare, consent_image_storage,
+      before_image_ref, after_image_ref
+  `;
+  const jobRow = inserted[0] as { id?: unknown } | undefined;
+  const jobId = asId(jobRow?.id);
+  if (jobId == null) {
+    return { ok: false, error: "insert_failed", message: "Failed to insert compare job." };
+  }
+
+  try {
+    await sql`
+      update rmf_compare_jobs
+      set status = 'running', started_at = now(), updated_at = now()
+      where id = ${jobId} and user_id = ${userId}
+    `;
+
+    const vision = await analyzeCompareImages(refs.before_image_ref, refs.after_image_ref);
+    const honest = buildHonestCompareActionResult({
+      before_image_ref: refs.before_image_ref,
+      after_image_ref: refs.after_image_ref,
+      source: options.source,
+      vision
+    });
+
+    const resultRows = await sql`
+      insert into rmf_compare_results (job_id, user_id, summary, score, data)
+      values (
+        ${jobId},
+        ${userId},
+        ${honest.summary},
+        ${sql.json(honest.score as any)},
+        ${sql.json(honest.data as any)}
+      )
+      returning id, job_id, summary, score, data
+    `;
+    const resultRow = resultRows[0] as {
+      id?: unknown;
+      job_id?: unknown;
+      summary?: unknown;
+      score?: unknown;
+      data?: unknown;
+    };
+    const resultId = asId(resultRow?.id);
+    if (resultId == null) throw new Error("result_insert_failed");
+
+    await sql`
+      update rmf_compare_jobs
+      set status = 'completed', completed_at = now(), updated_at = now(), error = null
+      where id = ${jobId} and user_id = ${userId}
+    `;
+
+    const interaction = await saveInteraction(
+      userId,
+      "compare",
+      "Compare Me To Me completed from consented before/after image refs",
+      {
+        compare_job_id: jobId,
+        compare_result_id: resultId,
+        source_interaction_id: sourceInteractionId,
+        live_product: false,
+        medical_claims: false,
+        live_vision: Boolean(vision.ok),
+        vision_limited: !vision.ok,
+        public_unauthenticated: false
+      }
+    );
+    const interactionId = asId((interaction as { id?: unknown } | undefined)?.id);
+
+    const recommendation = await saveRecommendation(userId, {
+      item_type: "context",
+      title: "Compare Me To Me completed",
+      data: {
+        compare_job_id: jobId,
+        compare_result_id: resultId,
+        live_product: false,
+        medical_claims: false,
+        live_vision: Boolean(vision.ok),
+        vision_limited: !vision.ok,
+        note: "Context note that a paid compare ran. Not a product recommendation."
+      },
+      source_interaction_id: interactionId ?? undefined
+    });
+
+    console.info("[compare:me_to_me]", {
+      user_id: userId,
+      job_id: jobId,
+      result_id: resultId,
+      live_vision: Boolean(vision.ok),
+      vision_reason: vision.ok ? null : vision.reason
+    });
+
+    return {
+      ok: true,
+      job: {
+        id: jobId,
+        status: "completed",
+        source_interaction_id: sourceInteractionId,
+        consent_compare: true,
+        consent_image_storage: consentImageStorage,
+        before_image_ref: refs.before_image_ref,
+        after_image_ref: refs.after_image_ref
+      },
+      result: {
+        id: resultId,
+        job_id: asId(resultRow.job_id) ?? jobId,
+        summary: String(resultRow.summary || honest.summary),
+        score: resultRow.score,
+        data: resultRow.data
+      },
+      follow_up: {
+        interaction: interactionId != null
+          ? { id: interactionId, created_at: (interaction as { created_at?: unknown }).created_at }
+          : null,
+        recommendation: recommendation && typeof recommendation === "object"
+          ? (recommendation as Record<string, unknown>)
+          : null
+      },
+      snapshot: {
+        has_profile: Boolean(snapshot.profile),
+        has_interaction: Boolean(snapshot.latest_interaction),
+        has_recommendation: Boolean(snapshot.latest_recommendation)
+      },
+      credits: { action: COMPARE_ACTION, cost: COMPARE_ACTION_COST }
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await sql`
+      update rmf_compare_jobs
+      set status = 'failed', error = ${message.slice(0, 500)}, completed_at = now(), updated_at = now()
+      where id = ${jobId} and user_id = ${userId}
+    `;
+    return {
+      ok: false,
+      error: "compare_failed",
       message,
       job: { id: jobId, status: "failed", error: message.slice(0, 500) }
     };

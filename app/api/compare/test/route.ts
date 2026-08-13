@@ -23,7 +23,8 @@ export const maxDuration = 30;
 /**
  * Authenticated, non-public Compare Me To Me TEST path.
  * Public GPT/OpenAPI stay off — this route is not an Action.
- * Unauthenticated callers get the same 503 compare_disabled as /api/compare.
+ * Unauthenticated callers get 503 compare_disabled (internal test is not public).
+ * Paid OpenAPI Action is POST /api/compare (401 without OAuth).
  */
 
 type ResolvedUser =
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     enabled: COMPARE_ME_TO_ME.enabled,
     status: COMPARE_ME_TO_ME.status,
-    public_api: "503 compare_disabled",
+    public_api: "401 oauth_required on /api/compare",
     test_path: COMPARE_ME_TO_ME.authenticated_test_path,
     actor: resolved.actor,
     user_id: resolved.userId,
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
         ok: true,
         enabled: COMPARE_ME_TO_ME.enabled,
         status: COMPARE_ME_TO_ME.status,
-        public_api: "503 compare_disabled",
+        public_api: "401 oauth_required on /api/compare",
         actor: resolved.actor,
         user_id: resolved.userId,
         job: result.job,

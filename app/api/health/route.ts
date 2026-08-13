@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { APPEARANCE_AGENT } from "../../../lib/appearanceAgent";
-import { COMPARE_ME_TO_ME, COMPARE_TEST_ACTION_COST } from "../../../lib/compareFeature";
+import { COMPARE_ACTION_COST, COMPARE_ME_TO_ME, COMPARE_TEST_ACTION_COST } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
 import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
 import {
@@ -30,17 +30,19 @@ export async function GET() {
       enabled_in_code: true,
       credits_per_pack: 100,
       metered_memory_cost: 1,
-      compare_authenticated_test_cost: COMPARE_TEST_ACTION_COST
+      compare_authenticated_test_cost: COMPARE_TEST_ACTION_COST,
+      compare_me_to_me_cost: COMPARE_ACTION_COST
     },
     compare_me_to_me: {
-      // FEATURE REMAINS DISABLED — schema may exist; do not flip LIVE.
-      // Authenticated /api/compare/test is internal TESTING only (not OpenAPI).
+      // Paid OpenAPI Action. Unauthenticated compare is not free. Not a LIVE vision claim.
       enabled: COMPARE_ME_TO_ME.enabled,
       status: COMPARE_ME_TO_ME.status,
+      vision_status: COMPARE_ME_TO_ME.vision_status,
       note: COMPARE_ME_TO_ME.note,
       tables: [...COMPARE_ME_TO_ME.tables],
+      action_path: COMPARE_ME_TO_ME.action_path,
       authenticated_test_path: COMPARE_ME_TO_ME.authenticated_test_path,
-      public_api: "503 compare_disabled"
+      public_unauthenticated: "401 oauth_required"
     },
     appearance_agent: {
       // FEATURE REMAINS DISABLED — not LIVE paid coaching; schema may exist.
@@ -62,12 +64,13 @@ export async function GET() {
       table: SOCIAL_PROVIDER_OAUTH.table
     },
     account_learning: {
-      openapi_version: "2.5.4",
+      openapi_version: "2.5.5",
       profile_empty_shape: "found=false + preferences={}",
       retrieve_action: "getPersonalNetwork",
       pipeline: "rmf_interactions → rmf_personal_recommendations",
-      compare_test_link: "opt-in RMF_COMPARE_TEST_LINK=1 queued linker only; /api/compare stays 503",
-      compare_authenticated_test: "POST /api/compare/test (OAuth/operator, 1 credit); not an OpenAPI Action"
+      compare_test_link: "opt-in RMF_COMPARE_TEST_LINK=1 queued linker only; not anonymous compare",
+      compare_authenticated_test: "POST /api/compare/test (OAuth/operator, 1 credit); internal history placeholder",
+      compare_action: "POST /api/compare compareMeToMe (OAuth + 1 credit + consent_compare + image refs)"
     },
     partner_tag: "ratemyfacegpt-20"
   });

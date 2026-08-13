@@ -99,17 +99,18 @@ describe("rmf compare RLS migration (policy matrix)", () => {
   });
 });
 
-describe("compare feature gate stays off", () => {
-  it("COMPARE_ME_TO_ME.enabled is false", () => {
-    assert.equal(COMPARE_ME_TO_ME.enabled, false);
-    assert.equal(COMPARE_ME_TO_ME.status, "testing");
-    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "TESTING");
+describe("compare feature gate is the paid Action", () => {
+  it("COMPARE_ME_TO_ME.enabled is true with PAID / limited vision", () => {
+    assert.equal(COMPARE_ME_TO_ME.enabled, true);
+    assert.equal(COMPARE_ME_TO_ME.status, "paid");
+    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "PAID");
+    assert.equal(COMPARE_ME_TO_ME.vision_status, "limited");
   });
 
-  it("health route still reports compare disabled via gate constant", () => {
+  it("health route reports compare via gate constant without a LIVE vision claim", () => {
     const health = readFileSync(HEALTH, "utf8");
     assert.match(health, /compare_me_to_me/);
-    assert.match(health, /FEATURE REMAINS DISABLED/);
+    assert.match(health, /Not a LIVE vision claim/);
     assert.match(health, /enabled:\s*COMPARE_ME_TO_ME\.enabled/);
     assert.match(health, /status:\s*COMPARE_ME_TO_ME\.status/);
     assert.match(health, /from ["'].*compareFeature["']/);

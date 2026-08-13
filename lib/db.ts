@@ -12,6 +12,8 @@ export const DB_LOCK_TIMEOUT_MS = 3000;
 /** Whole serverless DB operation budget (compare POST, operator agents, tests). */
 export const DB_OPERATION_TIMEOUT_MS = 12_000;
 export const COMPARE_TEST_DB_TIMEOUT_MS = 12_000;
+/** Paid Compare Action: DB + bounded vision attempt (still far below 300s). */
+export const COMPARE_ACTION_TIMEOUT_MS = 20_000;
 
 export class DatabaseTimeoutError extends Error {
   readonly timeoutMs: number;

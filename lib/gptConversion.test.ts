@@ -1,5 +1,5 @@
 /**
- * Conversion contracts: same-turn credit checkout, OpenAPI 2.5.4, conversation starters.
+ * Conversion contracts: same-turn credit checkout, OpenAPI 2.5.5, conversation starters.
  * Run: node --experimental-strip-types --test lib/gptConversion.test.ts
  */
 import assert from "node:assert/strict";
@@ -73,14 +73,14 @@ describe("conversation starters in paste lists", () => {
   });
 });
 
-describe("OpenAPI 2.5.4 conversion descriptions", () => {
+describe("OpenAPI 2.5.5 conversion descriptions", () => {
   const openapi = read("app/api/openapi/route.ts");
   const health = read("app/api/health/route.ts");
 
-  it("bumps schema version to 2.5.4", () => {
-    assert.match(openapi, /version:\s*"2\.5\.4"/);
-    assert.match(health, /openapi_version:\s*"2\.5\.4"/);
-    assert.equal(openapi.includes("2.5.3"), false);
+  it("bumps schema version to 2.5.5", () => {
+    assert.match(openapi, /version:\s*"2\.5\.5"/);
+    assert.match(health, /openapi_version:\s*"2\.5\.5"/);
+    assert.equal(openapi.includes("2.5.4"), false);
   });
 
   it("keeps createCreditCheckoutSession and getEntitlements descriptions ≤300 chars and auto-invoke ready", () => {
@@ -104,6 +104,17 @@ describe("OpenAPI 2.5.4 conversion descriptions", () => {
     assert.match(product, /FREE/);
     assert.match(product, /affiliate_url/);
     assert.match(product, /\(paid link\)/);
+  });
+
+  it("adds compareMeToMe with a ≤300 char description and 401/402/400 gates", () => {
+    const compare = operationDescription(openapi, "compareMeToMe");
+    assert.ok(compare.length <= 300, `compareMeToMe desc is ${compare.length}`);
+    assert.match(compare, /consent_compare=true/);
+    assert.match(compare, /1 credit/);
+    assert.match(compare, /400/);
+    assert.match(compare, /createCreditCheckoutSession/);
+    assert.match(compare, /No medical claims/);
+    assert.equal(openapi.includes("GPT_INSTRUCTIONS"), false);
   });
 });
 
@@ -130,6 +141,9 @@ describe("entitlementsCheckoutFields", () => {
     const route = read("app/api/billing/entitlements/route.ts");
     assert.match(route, /entitlementsCheckoutFields/);
     assert.match(route, /from \"\.\.\/\.\.\/\.\.\/\.\.\/lib\/entitlementsCheckout\"/);
+    assert.match(route, /compare_me_to_me:\s*PERSONAL_ACTION_COST/);
+    assert.match(route, /appearance_agent:\s*PERSONAL_ACTION_COST/);
+    assert.equal(route.includes("COMPARE_ACTION_COST"), false);
     const helper = read("lib/entitlementsCheckout.ts");
     assert.match(helper, /checkout_action: \"createCreditCheckoutSession\"/);
   });

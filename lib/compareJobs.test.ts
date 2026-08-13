@@ -79,29 +79,33 @@ describe("buildHonestCompareTestResult", () => {
 });
 
 describe("compare public gate vs authenticated test", () => {
-  it("keeps COMPARE_ME_TO_ME.enabled false with TESTING status", () => {
-    assert.equal(COMPARE_ME_TO_ME.enabled, false);
-    assert.equal(COMPARE_ME_TO_ME.status, "testing");
-    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "TESTING");
+  it("enables the paid Action as PAID with limited vision, not a LIVE marketing claim", () => {
+    assert.equal(COMPARE_ME_TO_ME.enabled, true);
+    assert.equal(COMPARE_ME_TO_ME.status, "paid");
+    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "PAID");
+    assert.equal(COMPARE_ME_TO_ME.vision_status, "limited");
+    assert.equal(COMPARE_ME_TO_ME.action_path, "/api/compare");
     assert.equal(COMPARE_ME_TO_ME.authenticated_test_path, "/api/compare/test");
     assert.equal(COMPARE_TEST_ACTION_COST, 1);
     assert.equal(COMPARE_TEST_ACTION, "compare:authenticated_test");
     const stub = compareDisabledResponse(503);
     assert.equal(stub.status, 503);
-    assert.equal(stub.body.error, "compare_disabled");
-    assert.equal(stub.body.enabled, false);
+    assert.equal(stub.body.error, "compare_jobs_not_public");
   });
 
-  it("public /api/compare and /api/compare/jobs stay 503 stubs", () => {
+  it("public /api/compare/jobs stays 503; /api/compare is the OAuth Action (not anonymous)", () => {
     const compare = readFileSync(join(ROOT, "app/api/compare/route.ts"), "utf8");
     const jobs = readFileSync(join(ROOT, "app/api/compare/jobs/route.ts"), "utf8");
-    assert.match(compare, /compareDisabledResponse\(503\)/);
     assert.match(jobs, /compareDisabledResponse\(503\)/);
+    assert.match(compare, /oauth_required/);
+    assert.match(compare, /runAuthenticatedCompare/);
+    assert.match(compare, /consumeCredits/);
+    assert.match(compare, /consent_compare/);
     assert.equal(compare.includes("runAuthenticatedCompareTest"), false);
-    assert.equal(jobs.includes("runAuthenticatedCompareTest"), false);
+    assert.equal(jobs.includes("runAuthenticatedCompare"), false);
   });
 
-  it("authenticated test route meters credits, bounds DB waits, and is not an OpenAPI Action", () => {
+  it("authenticated test route meters credits, bounds DB waits, and stays off OpenAPI", () => {
     const testRoute = readFileSync(join(ROOT, "app/api/compare/test/route.ts"), "utf8");
     assert.match(testRoute, /runAuthenticatedCompareTest/);
     assert.match(testRoute, /consumeCredits/);
@@ -111,8 +115,9 @@ describe("compare public gate vs authenticated test", () => {
     assert.match(testRoute, /withDatabaseTimeout/);
     assert.match(testRoute, /database_timeout/);
     const openapi = readFileSync(join(ROOT, "app/api/openapi/route.ts"), "utf8");
-    assert.equal(openapi.includes("/api/compare"), false);
     assert.equal(openapi.includes("compare:authenticated_test"), false);
+    assert.match(openapi, /compareMeToMe/);
+    assert.match(openapi, /\/api\/compare/);
   });
 
   it("test runner writes job, result, follow-up interaction, and context note", () => {
@@ -125,15 +130,16 @@ describe("compare public gate vs authenticated test", () => {
     assert.match(jobs, /item_type:\s*"context"/);
     assert.match(jobs, /live_product: false/);
     assert.match(jobs, /medical_claims: false/);
+    assert.match(jobs, /runAuthenticatedCompare/);
     assert.equal(jobs.includes("searchProduct"), false);
   });
 
-  it("health still reports enabled=false and documents the test path", () => {
+  it("health reports the paid Action without a LIVE vision claim", () => {
     const health = readFileSync(join(ROOT, "app/api/health/route.ts"), "utf8");
-    assert.match(health, /FEATURE REMAINS DISABLED/);
     assert.match(health, /enabled:\s*COMPARE_ME_TO_ME\.enabled/);
     assert.match(health, /authenticated_test_path/);
-    assert.match(health, /503 compare_disabled/);
-    assert.match(health, /compare_authenticated_test_cost/);
+    assert.match(health, /401 oauth_required/);
+    assert.match(health, /compare_me_to_me_cost/);
+    assert.match(health, /compareMeToMe/);
   });
 });

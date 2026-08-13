@@ -1,36 +1,40 @@
 /**
- * Compare Me To Me feature gate.
+ * Compare Me To Me — paid authenticated OpenAPI Action.
  *
- * Public GPT / OpenAPI stay DISABLED (`enabled=false`, `/api/compare` 503).
- * Schema exists for ops/RLS. An authenticated OAuth / owner / operator TEST
- * path may persist jobs from Account Learning history — that does not flip LIVE.
+ * Unauthenticated / anonymous compare is not a product (401 on /api/compare,
+ * 503 on /api/compare/jobs). Appearance Agent stays off. Vision is attempted
+ * when fetchable https image refs exist; dashboard must not claim LIVE if
+ * vision is limited.
  *
- * Account Learning may also insert a queued test job with source_interaction_id
- * when RMF_COMPARE_TEST_LINK=1 (see lib/compareJobs.ts). That still does not
- * enable this flag or public /api/compare.
+ * Internal POST /api/compare/test remains a history-placeholder path.
  */
 
 export const COMPARE_ME_TO_ME = {
-  enabled: false as const,
-  /** Health / OpenAPI-facing status. Public feature stays off. */
-  status: "testing" as const,
-  /** Operator dashboard status badge — TESTING while public remains disabled. */
-  dashboard_status: "TESTING" as const,
-  note: "Public GPT/OpenAPI stays off. Authenticated OAuth/operator test path may persist jobs from Account Learning history. Not LIVE photo compare and not a product Action.",
-  gate: "Public /api/compare remains 503 compare_disabled. Do NOT enable production until consented image storage + live analysis exist. Authenticated test path is internal only.",
+  enabled: true as const,
+  /** Health / OpenAPI-facing status. Paid Action, not a LIVE marketing claim. */
+  status: "paid" as const,
+  /** Operator dashboard status badge — PAID, not LIVE. */
+  dashboard_status: "PAID" as const,
+  vision_status: "limited" as const,
+  note: "Paid compareMeToMe Action (OAuth + 1 credit, same unit as Personal Network, + consent_compare + real before/after image refs). Vision runs when https image URLs are fetchable via AI Gateway; otherwise the result is an honest limited compare. Not a free public product and not a LIVE unlimited-vision claim.",
+  gate: "Paid OpenAPI Action at POST /api/compare. Unauthenticated callers get 401. Job listing stays 503. Requires consent_compare=true and real image refs (4xx if missing — never placeholder-as-real). Vision limited. Appearance Agent stays off. Cost is PERSONAL_ACTION_COST (1), not a vision surcharge.",
   tables: ["rmf_compare_jobs", "rmf_compare_results"] as const,
+  action_path: "/api/compare" as const,
   authenticated_test_path: "/api/compare/test" as const,
   disabled_http: {
     ok: false as const,
-    error: "compare_disabled" as const,
+    error: "compare_jobs_not_public" as const,
     message:
-      "Compare Me To Me is not available yet. Account Learning + consented history must ship first."
+      "Public compare job listing is not available. Use the authenticated compareMeToMe Action."
   }
 };
 
-/** Credits charged for the authenticated history-placeholder test (not live vision). */
+/** Same Stripe credit unit as Personal Network (`PERSONAL_ACTION_COST`) — do not invent a vision surcharge. */
 export const COMPARE_TEST_ACTION_COST = 1;
 export const COMPARE_TEST_ACTION = "compare:authenticated_test";
+
+export const COMPARE_ACTION_COST = 1;
+export const COMPARE_ACTION = "compare:me_to_me";
 
 export function compareDisabledResponse(status = 503) {
   return {
@@ -43,7 +47,7 @@ export function compareDisabledResponse(status = 503) {
   };
 }
 
-/** Opt-in queued job linker on learning writes. Does not enable COMPARE_ME_TO_ME or /api/compare. */
+/** Opt-in queued job linker on learning writes. Does not expose anonymous compare. */
 export function compareTestLinkEnabled(): boolean {
   return process.env.RMF_COMPARE_TEST_LINK === "1";
 }

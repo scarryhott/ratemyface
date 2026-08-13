@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.4",
+      version: "2.5.5",
       description:
-        "FREE product links + credit-metered account learning. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
+        "FREE product links + credit-metered account learning and Compare Me To Me. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -135,6 +135,27 @@ export async function GET(request: NextRequest) {
           description: "Never paywalled. Deletes legacy context and Personal Network profile for the authenticated user.",
           responses: { "200": { description: "Deleted" } }
         }
+      },
+      "/api/compare": {
+        post: {
+          operationId: "compareMeToMe",
+          summary: "PAID/METERED — Compare Me To Me before/after (1 credit)",
+          description:
+            "PAID — Compare Me To Me. OAuth, consent_compare=true, and real before/after image refs required. Costs 1 credit (same unit as Personal Network). Missing refs return 400, never fake analysis. On 402 MUST call createCreditCheckoutSession same turn. No medical claims or invented ASINs.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CompareRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted compare job + honest result" },
+            "400": { description: "Missing consent_compare or real before/after image refs" },
+            "401": { description: "OAuth required — not a free anonymous compare" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        }
       }
     },
     components: {
@@ -204,6 +225,32 @@ export async function GET(request: NextRequest) {
             url: { type: "string", format: "uri" },
             recommendation_id: { type: "integer" },
             feedback: { type: "string", maxLength: 200 }
+          }
+        },
+        CompareRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["consent_compare"],
+          properties: {
+            consent_compare: {
+              type: "boolean",
+              const: true,
+              description: "Must be true. Explicit consent to run Compare Me To Me on before/after images."
+            },
+            consent_image_storage: {
+              type: "boolean",
+              description: "Optional. True if the user consents to retain image refs on the compare job."
+            },
+            before_image_ref: {
+              type: "string",
+              maxLength: 2000,
+              description: "Before image HTTPS URL or stored ref. Required unless already on the user's profile."
+            },
+            after_image_ref: {
+              type: "string",
+              maxLength: 2000,
+              description: "After image HTTPS URL or stored ref. Required unless already on the user's profile."
+            }
           }
         },
         CreditsRequiredResponse: {

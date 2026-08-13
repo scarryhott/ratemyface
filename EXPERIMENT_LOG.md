@@ -137,3 +137,15 @@ Append one concise entry per material experiment.
 - **Change made:** GPT instructions same-turn checkout; OpenAPI 2.5.4 stronger buy/balance descriptions; `getEntitlements` emits `checkout_action` + pack size when balance cannot cover next metered cost; buy-credits conversation starter. searchProduct stays FREE. Public Compare stays OFF. Stripe price IDs unchanged.
 - **Rollback:** revert this commit and re-paste prior GPT_INSTRUCTIONS / OpenAPI 2.5.3.
 - **Next:** monitor Stripe Checkout Sessions after instructions are pasted into the GPT editor.
+
+### 2026-08-13 — Subscription feature = Compare Me To Me Action on credits
+- **Surface:** GPT OpenAPI Action + Vercel API + Stripe credit ledger
+- **Hypothesis:** Shipping Compare as an authenticated, credit-metered OpenAPI Action (real image refs, explicit consent) is the paid subscription feature; instruction rewrites are not required.
+- **Variant A:** public `/api/compare` 503 stub / internal history-placeholder test only
+- **Variant B:** `compareMeToMe` Action on `POST /api/compare` — OAuth + `consumeCredits` (1, same unit as Personal Network) + `consent_compare=true` + real before/after refs; 400 if refs missing; vision when https URLs work, otherwise honest limited result
+- **Metric:** authenticated compare consumes credits and persists `rmf_compare_jobs` + `rmf_compare_results`; unauthenticated compare is not free; `getEntitlements.metered_costs.compare_me_to_me=1` (same as personal_network / appearance_agent)
+- **Evidence/source:** OpenAPI 2.5.5 `compareMeToMe`; existing compare tables/RLS; same Stripe ledger and 1-credit unit as Personal Network
+- **Result:** pending deploy + one authenticated Action call with real image refs
+- **Change made:** paid Compare Action on credits; public jobs listing stays 503; Appearance/social flags unchanged; affiliate/searchProduct untouched; GPT_INSTRUCTIONS.md not modified
+- **Rollback:** revert this commit and re-import prior OpenAPI 2.5.4
+- **Next:** re-import `/api/openapi` (do not paste GPT instructions); run consented compare with before/after image URLs

@@ -161,7 +161,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
 
   notes.push("ChatGPT chat counts and Amazon Associates live revenue are not ingested — leave Unavailable rather than inventing.");
   notes.push("Account Learning pipeline writes rmf_interactions and derives rmf_personal_recommendations on paid Personal Network saves.");
-  notes.push("Compare Me To Me remains disabled until image storage + consent + history exist.");
+  notes.push("Paid Compare Me To Me Action is credit-metered (OAuth + consent_compare + real image refs). Vision is limited; do not claim LIVE unlimited vision. Unauthenticated compare is not free.");
   return base;
 }
 
@@ -282,7 +282,7 @@ export function businessImproveGoal(): string {
     "Propose one reversible next step at minimum authority.",
     "Return JSON including business_impact:{bottleneck,hypothesis,recommended_next_step,expected_metric_effect,funnel_stage,confidence}.",
     "Do not invent ChatGPT chat counts, Amazon revenue, or Stripe USD. Label missing sources Unavailable.",
-    "Compare Me To Me stays DISABLED. Appearance Agent stays DISABLED (not LIVE paid coaching; requires Account Learning + Compare).",
+    "Compare Me To Me is a paid credit-metered Action (vision limited; not a LIVE marketing claim). Appearance Agent stays DISABLED (not LIVE paid coaching).",
     "Prefer Account Learning + credit economy closure over new features.",
     "Report clearly how the recommended strategy helps the business."
   ].join(" ");
