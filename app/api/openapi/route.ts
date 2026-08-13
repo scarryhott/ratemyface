@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
           operationId: "appearancePlan",
           summary: "PAID/METERED — 90-day professional-image plan (1 credit)",
           description:
-            "PAID — 90-day professional-image plan from Account Learning + Compare history. OAuth, consent_appearance=true, and required history. Costs 1 credit (same unit as Personal Network). Missing history returns 400, never invented coaching. On 402 MUST call createCreditCheckoutSession same turn. No medical claims.",
+            "PAID — 90-day professional-image plan from Account Learning + Compare history. OAuth, consent_appearance=true, required history. Costs 1 credit. Missing history returns 400, never invented coaching. On 402 MUST call createCreditCheckoutSession same turn. No medical claims.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/AppearancePlanRequest" } } }

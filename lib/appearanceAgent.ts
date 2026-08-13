@@ -7,8 +7,39 @@
  * Social scraping stays off. Cost is PERSONAL_ACTION_COST (1).
  */
 
-import { asRecord, firstString, hasPreferencePayload } from "./accountLearningShape";
-import { looksMedical } from "./compareVision";
+/** Local helpers so node:test can import this file without extensionless ESM hops. */
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed.slice(0, 2000);
+  }
+  return null;
+}
+
+function hasPreferencePayload(value: unknown): boolean {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>).filter(([key, val]) => {
+    if (key === "consent_personalization" || key === "consent_history") return false;
+    if (val == null || val === "") return false;
+    if (typeof val === "object" && !Array.isArray(val) && Object.keys(val as object).length === 0) return false;
+    return true;
+  });
+  return entries.length > 0;
+}
+
+const MEDICAL_RE =
+  /\b(diagnos(?:e|is|ed)|treat(?:ment|ed)?|cure[ds]?|melanoma|carcinoma|cancer|disease|prescription|clinical|patholog(?:y|ic))\b/i;
+
+function looksMedical(text: string): boolean {
+  return MEDICAL_RE.test(text);
+}
 
 export const APPEARANCE_AGENT = {
   enabled: true as const,
