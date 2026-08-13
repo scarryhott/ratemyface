@@ -96,7 +96,8 @@ export function CompareControlSection({ data }: { data: CompareControl }) {
           </span>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Feature remains DISABLED for users. Job counts are live empties (expect 0) or Unavailable — no fake numbers.
+          Public feature remains DISABLED. Status TESTING is the authenticated internal path only
+          (not OpenAPI). Job counts are live table rows — never invented.
         </p>
         <section style={grid4}>
           <MetricCard label="Jobs queued" metric={data.jobs_queued} />

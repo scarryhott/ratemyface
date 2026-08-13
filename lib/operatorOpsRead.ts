@@ -8,6 +8,7 @@ import {
   stripeSecretConfigured,
   stripeWebhookConfigured
 } from "./stripeBilling";
+import { COMPARE_TEST_ACTION_COST } from "./compareFeature";
 import { PERSONAL_ACTION_COST, REPORT_ACTION_COST } from "./personalNetwork";
 
 function asNumber(value: unknown): number {
@@ -31,6 +32,7 @@ async function readBillingOverview(tx: any) {
     metered_personal_cost: PERSONAL_ACTION_COST,
     metered_memory_cost: MEMORY_CONTEXT_COST,
     report_cost: REPORT_ACTION_COST,
+    compare_authenticated_test_cost: COMPARE_TEST_ACTION_COST,
     signup_credits: signupCredits(),
     label: productCreditLabel()
   };
@@ -63,7 +65,7 @@ async function readBillingOverview(tx: any) {
       created_at: string;
     }>,
     revenue_mapping:
-      "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory=1, report=5); founder grantCredits on /operator/dashboard; optional signup_grant (RMF_SIGNUP_CREDITS, default 100); packs via createCreditCheckoutSession → webhook → same rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
+      "PRODUCT credits only: paid persistence consumes Stripe-metered Rate My Face credits (personal/memory=1, report=5, compare authenticated test=1); founder grantCredits on /operator/dashboard; optional signup_grant (RMF_SIGNUP_CREDITS, default 100); packs via createCreditCheckoutSession → webhook → same rmf_credit_ledger. Not Vercel Hobby quotas and not Vercel AI Gateway USD. Premium UI stays disabled until STRIPE_PRICE_ID_PREMIUM is configured."
   };
 
   const hasCredits = await tableExists(tx, "rmf_credit_accounts");

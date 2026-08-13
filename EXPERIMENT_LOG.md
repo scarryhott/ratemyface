@@ -101,3 +101,15 @@ Append one concise entry per material experiment.
 - **Change made:** paid profile/recommendation/feedback writes record interactions; product URL/title derives/upserts personal recommendations; optional `RMF_COMPARE_TEST_LINK=1` soft-links `rmf_compare_jobs.source_interaction_id` without flipping Compare LIVE. `searchProduct` remains free and does not write learning rows. No new OpenAPI Action.
 - **Rollback:** revert this pipeline commit; column `source_interaction_id` is nullable and unused if writers roll back.
 - **Next / monitor:** trigger save path → row in `rmf_interactions` → row in `rmf_personal_recommendations`; confirm `/api/compare` 503 and dashboard counts (or Unavailable if tables missing).
+
+### 2026-08-13 — Authenticated Compare Me To Me TEST path (public stays DISABLED)
+- **Surface:** Vercel API + Account Learning history + operator dashboard Compare section
+- **Hypothesis:** An OAuth/owner/operator-only test can persist `rmf_compare_jobs` + `rmf_compare_results` from existing profile/interaction/recommendation rows, plus a follow-up context note, without enabling public Compare or inventing products/medical claims.
+- **Variant A:** n/a (internal test path)
+- **Variant B:** n/a
+- **Metric:** public `/api/compare` stays 503 `compare_disabled`; health `compare_me_to_me.enabled=false`; authenticated `POST /api/compare/test` (1 credit) creates job+result+follow-up; dashboard Compare counts are live (0→1) and labeled TESTING / public DISABLED.
+- **Evidence/source:** `lib/compareJobs.ts` `runAuthenticatedCompareTest`, `/api/compare/test`, existing `rmf_compare_*` schema/RLS.
+- **Result:** pending deploy + one authenticated/operator call against the existing Account Learning user.
+- **Change made:** server-only test endpoint; honest history-placeholder result; follow-up `compare_test` interaction + `context` recommendation; credits metered via `consumeCredits`. Public OpenAPI/GPT unchanged. Amazon/social/appearance flags untouched.
+- **Rollback:** revert this commit; public stubs remain 503; test rows can stay as TESTING artifacts.
+- **Next / monitor:** public 503; authenticated test → job+result+follow-up; health `enabled=false`; dashboard live job counts.

@@ -3,7 +3,7 @@ import { compareDisabledResponse } from "../../../../lib/compareFeature";
 
 export const runtime = "nodejs";
 
-/** Thin stub for future job listing/create — always 503 while disabled. */
+/** Thin stub for public job listing/create — always 503. Authenticated test is POST /api/compare/test. */
 export async function GET() {
   const { status, body } = compareDisabledResponse(503);
   return NextResponse.json(body, { status });
