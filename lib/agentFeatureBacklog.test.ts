@@ -60,7 +60,7 @@ const liveHealth: ProductionHealthEvidence = {
   target: "https://example.vercel.app/api/health",
   account_learning_retrieve_action: "getPersonalNetwork",
   compare_enabled: true,
-  appearance_enabled: false,
+  appearance_enabled: true,
   social_enabled: false
 };
 
@@ -84,6 +84,8 @@ describe("versioned feature backlog", () => {
       assert.match(openapi, new RegExp(`operationId:\\s*"${op}"`));
     }
     assert.match(openapi, /compareMeToMe/);
+    assert.match(openapi, /appearancePlan/);
+    assert.match(openapi, /appearanceCheckin/);
     assert.equal(openapi.includes("appearanceAgent"), false);
   });
 });
@@ -200,17 +202,17 @@ describe("decideManagerialAction", () => {
     assert.equal(decision.feature_progress, false);
   });
 
-  it("dispatches Appearance after learning + compare have verified receipts", () => {
+  it("verifies Appearance after learning + compare have verified receipts", () => {
     const decision = decideManagerialAction({
       evidence: evidence(),
       receipts: [shippedReceipt("account_learning"), shippedReceipt("compare_me_to_me")],
       production: liveHealth,
       admittedAuthority: 2
     });
-    assert.equal(decision.action, "dispatch");
+    assert.equal(decision.action, "verify");
     assert.equal(decision.selected_item?.id, "appearance_agent");
-    assert.equal(decision.candidate?.tool, "github_implementation_dispatch");
-    assert.equal(APPEARANCE_AGENT.enabled, false);
+    assert.equal(decision.candidate?.tool, "feature_production_verify");
+    assert.equal(APPEARANCE_AGENT.enabled, true);
     assert.equal(COMPARE_ME_TO_ME.enabled, true);
     assert.equal(inspectRepoEvidence().flags.appearance_agent, APPEARANCE_AGENT.enabled);
     assert.equal(inspectRepoEvidence().flags.compare_me_to_me, COMPARE_ME_TO_ME.enabled);
@@ -219,7 +221,7 @@ describe("decideManagerialAction", () => {
 
   it("records blocked-on approval instead of observing when L2 is not admitted", () => {
     const decision = decideManagerialAction({
-      evidence: evidence({ max_authority: 1 }),
+      evidence: evidence({ max_authority: 1, flags: { appearance_agent: false } }),
       receipts: [shippedReceipt("account_learning"), shippedReceipt("compare_me_to_me")],
       production: liveHealth,
       admittedAuthority: 1
@@ -233,7 +235,7 @@ describe("decideManagerialAction", () => {
 
   it("records blocked-on missing_secret when GitHub write is not configured", () => {
     const decision = decideManagerialAction({
-      evidence: evidence({ github_write_configured: false }),
+      evidence: evidence({ github_write_configured: false, flags: { appearance_agent: false } }),
       receipts: [shippedReceipt("account_learning"), shippedReceipt("compare_me_to_me")],
       production: liveHealth,
       admittedAuthority: 2
@@ -281,7 +283,7 @@ describe("decideManagerialAction", () => {
       executedTool: "project_context_read",
       receiptVerified: true
     });
-    assert.equal(decision.action, "dispatch");
+    assert.equal(decision.action, "verify");
     assert.equal(cycle.outcome, "noop_failed");
     assert.equal(cycle.feature_progress, false);
   });
@@ -309,7 +311,7 @@ describe("production verification", () => {
     const compare = verifyFeatureAgainstHealth(FEATURE_BACKLOG_SPEC.items[1], liveHealth);
     assert.equal(compare.verified, true);
     const appearance = verifyFeatureAgainstHealth(FEATURE_BACKLOG_SPEC.items[2], liveHealth);
-    assert.equal(appearance.verified, false);
+    assert.equal(appearance.verified, true);
   });
 });
 

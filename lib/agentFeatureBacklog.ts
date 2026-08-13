@@ -146,7 +146,9 @@ export const KNOWN_OPENAPI_OPERATIONS = [
   "getUserContext",
   "saveUserContext",
   "deleteUserContext",
-  "compareMeToMe"
+  "compareMeToMe",
+  "appearancePlan",
+  "appearanceCheckin"
 ] as const;
 
 /** Canonical spec (keep in sync with operator/FEATURE_BACKLOG.json). */
@@ -196,14 +198,14 @@ export const FEATURE_BACKLOG_SPEC: FeatureBacklogFile = {
       title: "Appearance Agent",
       priority: 3,
       acceptance: [
-        "APPEARANCE_AGENT.enabled is true only after Account Learning + Compare gates",
+        "Paid OpenAPI appearancePlan and appearanceCheckin Actions are enabled",
         "Health appearance_agent.enabled is true",
-        "OpenAPI Action exists when enabled; until then stubs stay disabled / not LIVE coaching",
-        "Future paid ops use the same 1-credit unit"
+        "POST /api/appearance and /api/appearance/plans meter 1 credit with consent_appearance and required history",
+        "Unauthenticated appearance is not free; do not claim LIVE unlimited coaching"
       ],
       evidence: {
         flag_module: "APPEARANCE_AGENT.enabled",
-        openapi_operations: [],
+        openapi_operations: ["appearancePlan", "appearanceCheckin"],
         health_enabled_path: "appearance_agent.enabled",
         tables: ["rmf_appearance_plans", "rmf_appearance_checkins"],
         endpoint: "/api/appearance"
@@ -242,7 +244,7 @@ export function inspectRepoEvidence(overrides: Partial<RepoEvidence> = {}): Repo
     // Keep aligned with COMPARE_ME_TO_ME / APPEARANCE_AGENT / SOCIAL_PROVIDER_OAUTH.
     account_learning: true,
     compare_me_to_me: true,
-    appearance_agent: false,
+    appearance_agent: true,
     social_oauth: false,
     ...(overrides.flags || {})
   };
@@ -325,7 +327,7 @@ export function evidenceComplete(
   const ops = item.evidence.openapi_operations.length ? openapiPresent(item, evidence) : flag;
   if (item.id === "account_learning") return flag && ops;
   if (item.id === "compare_me_to_me") return flag && ops;
-  if (item.id === "appearance_agent") return flag;
+  if (item.id === "appearance_agent") return flag && ops;
   if (item.id === "social_oauth") return flag && evidence.social_credentials_configured;
   return flag && ops;
 }

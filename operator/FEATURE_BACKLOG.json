@@ -44,14 +44,14 @@
       "title": "Appearance Agent",
       "priority": 3,
       "acceptance": [
-        "APPEARANCE_AGENT.enabled is true only after Account Learning + Compare gates",
+        "Paid OpenAPI appearancePlan and appearanceCheckin Actions are enabled",
         "Health appearance_agent.enabled is true",
-        "OpenAPI Action exists when enabled; until then stubs stay disabled / not LIVE coaching",
-        "Future paid ops use the same 1-credit unit"
+        "POST /api/appearance and /api/appearance/plans meter 1 credit with consent_appearance and required history",
+        "Unauthenticated appearance is not free; do not claim LIVE unlimited coaching"
       ],
       "evidence": {
         "flag_module": "APPEARANCE_AGENT.enabled",
-        "openapi_operations": [],
+        "openapi_operations": ["appearancePlan", "appearanceCheckin"],
         "health_enabled_path": "appearance_agent.enabled",
         "tables": ["rmf_appearance_plans", "rmf_appearance_checkins"],
         "endpoint": "/api/appearance"
