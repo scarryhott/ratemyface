@@ -6,12 +6,19 @@ import {
   compareDisabledResponse
 } from "../../../../lib/compareFeature";
 import { readCompareLearningSnapshot, runAuthenticatedCompareTest } from "../../../../lib/compareJobs";
-import { databaseConfigured } from "../../../../lib/db";
+import {
+  COMPARE_TEST_DB_TIMEOUT_MS,
+  databaseConfigured,
+  isDatabaseTimeoutError,
+  withDatabaseTimeout
+} from "../../../../lib/db";
 import { operatorRequestAuthorized } from "../../../../lib/operatorOwnerAuth";
 import { consumeCredits, creditBalance, ensureSignupCreditGrant } from "../../../../lib/stripeBilling";
 import { currentOAuthUser } from "../../../../lib/supabaseAuth";
 
 export const runtime = "nodejs";
+/** Platform backstop only — the handler must still fail fast via withDatabaseTimeout. */
+export const maxDuration = 30;
 
 /**
  * Authenticated, non-public Compare Me To Me TEST path.
@@ -87,61 +94,80 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "database_not_configured" }, { status: 503 });
   }
 
-  const snapshot = await readCompareLearningSnapshot(resolved.userId);
-  if (!snapshot.profile && !snapshot.latest_interaction && !snapshot.latest_recommendation) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "no_account_learning_history",
-        message: "No stored profile, interaction, or recommendation to compare from.",
-        enabled: COMPARE_ME_TO_ME.enabled
-      },
-      { status: 409 }
-    );
-  }
+  try {
+    return await withDatabaseTimeout(async () => {
+      const snapshot = await readCompareLearningSnapshot(resolved.userId);
+      if (!snapshot.profile && !snapshot.latest_interaction && !snapshot.latest_recommendation) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "no_account_learning_history",
+            message: "No stored profile, interaction, or recommendation to compare from.",
+            enabled: COMPARE_ME_TO_ME.enabled
+          },
+          { status: 409 }
+        );
+      }
 
-  await ensureSignupCreditGrant(resolved.userId);
-  const charged = await consumeCredits(resolved.userId, COMPARE_TEST_ACTION_COST, COMPARE_TEST_ACTION);
-  if (!charged.ok) return creditsDenied(charged.balance);
+      await ensureSignupCreditGrant(resolved.userId);
+      const charged = await consumeCredits(resolved.userId, COMPARE_TEST_ACTION_COST, COMPARE_TEST_ACTION);
+      if (!charged.ok) return creditsDenied(charged.balance);
 
-  const consentCompare = body.consent_compare === false ? false : true;
-  const consentImageStorage = body.consent_image_storage === true;
-  const result = await runAuthenticatedCompareTest(resolved.userId, {
-    consent_compare: consentCompare,
-    consent_image_storage: consentImageStorage
-  });
+      const consentCompare = body.consent_compare === false ? false : true;
+      const consentImageStorage = body.consent_image_storage === true;
+      const result = await runAuthenticatedCompareTest(resolved.userId, {
+        consent_compare: consentCompare,
+        consent_image_storage: consentImageStorage
+      });
 
-  if (!result.ok) {
-    const status =
-      result.error === "no_account_learning_history"
-        ? 409
-        : result.error === "compare_schema_missing" || result.error === "database_not_configured"
-          ? 503
-          : 500;
-    return NextResponse.json(
-      {
-        ...result,
+      if (!result.ok) {
+        const status =
+          result.error === "no_account_learning_history"
+            ? 409
+            : result.error === "compare_schema_missing" || result.error === "database_not_configured"
+              ? 503
+              : 500;
+        return NextResponse.json(
+          {
+            ...result,
+            enabled: COMPARE_ME_TO_ME.enabled,
+            credits_charged: COMPARE_TEST_ACTION_COST,
+            credits_remaining: await creditBalance(resolved.userId)
+          },
+          { status }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
         enabled: COMPARE_ME_TO_ME.enabled,
+        status: COMPARE_ME_TO_ME.status,
+        public_api: "503 compare_disabled",
+        actor: resolved.actor,
+        user_id: resolved.userId,
+        job: result.job,
+        result: result.result,
+        follow_up: result.follow_up,
+        snapshot: result.snapshot,
         credits_charged: COMPARE_TEST_ACTION_COST,
-        credits_remaining: await creditBalance(resolved.userId)
-      },
-      { status }
-    );
+        credits_remaining: await creditBalance(resolved.userId),
+        note: "Honest history-placeholder test. Not LIVE photo compare and not a product Action."
+      });
+    }, COMPARE_TEST_DB_TIMEOUT_MS);
+  } catch (error) {
+    if (isDatabaseTimeoutError(error)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "database_timeout",
+          message:
+            "Postgres did not respond in time. Compare test did not complete. Check rmf_credit_ledger before retrying.",
+          timeout_ms: COMPARE_TEST_DB_TIMEOUT_MS,
+          enabled: COMPARE_ME_TO_ME.enabled
+        },
+        { status: 504 }
+      );
+    }
+    throw error;
   }
-
-  return NextResponse.json({
-    ok: true,
-    enabled: COMPARE_ME_TO_ME.enabled,
-    status: COMPARE_ME_TO_ME.status,
-    public_api: "503 compare_disabled",
-    actor: resolved.actor,
-    user_id: resolved.userId,
-    job: result.job,
-    result: result.result,
-    follow_up: result.follow_up,
-    snapshot: result.snapshot,
-    credits_charged: COMPARE_TEST_ACTION_COST,
-    credits_remaining: await creditBalance(resolved.userId),
-    note: "Honest history-placeholder test. Not LIVE photo compare and not a product Action."
-  });
 }

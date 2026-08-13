@@ -1,8 +1,8 @@
 import Stripe from "stripe";
-import { db, ensureMemorySchema } from "./db";
+import { db, ensureMemorySchema, newSchemaSlot, runOncePerDbClient } from "./db";
 
 let stripeClient: Stripe | null = null;
-let billingSchemaReady: Promise<void> | null = null;
+const billingSchemaSlot = newSchemaSlot();
 
 export const PREMIUM_FEATURE = "premium";
 export const MEMORY_CONTEXT_COST = 1;
@@ -61,8 +61,7 @@ export function signupCredits(): number {
 }
 
 export async function ensureBillingSchema(): Promise<void> {
-  if (billingSchemaReady) return billingSchemaReady;
-  billingSchemaReady = (async () => {
+  return runOncePerDbClient(billingSchemaSlot, async () => {
     await ensureMemorySchema();
     const sql = db();
 
@@ -125,8 +124,7 @@ export async function ensureBillingSchema(): Promise<void> {
     await sql`create index if not exists rmf_billing_customer_idx on rmf_billing_accounts(stripe_customer_id)`;
     await sql`create index if not exists rmf_billing_subscription_idx on rmf_billing_accounts(stripe_subscription_id)`;
     await sql`create index if not exists rmf_credit_ledger_user_idx on rmf_credit_ledger(user_id, created_at desc)`;
-  })();
-  return billingSchemaReady;
+  });
 }
 
 export async function billingAccount(userId: string) {

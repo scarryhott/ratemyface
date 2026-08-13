@@ -101,13 +101,15 @@ describe("compare public gate vs authenticated test", () => {
     assert.equal(jobs.includes("runAuthenticatedCompareTest"), false);
   });
 
-  it("authenticated test route meters credits and is not an OpenAPI Action", () => {
+  it("authenticated test route meters credits, bounds DB waits, and is not an OpenAPI Action", () => {
     const testRoute = readFileSync(join(ROOT, "app/api/compare/test/route.ts"), "utf8");
     assert.match(testRoute, /runAuthenticatedCompareTest/);
     assert.match(testRoute, /consumeCredits/);
     assert.match(testRoute, /COMPARE_TEST_ACTION_COST/);
     assert.match(testRoute, /currentOAuthUser/);
     assert.match(testRoute, /operatorRequestAuthorized/);
+    assert.match(testRoute, /withDatabaseTimeout/);
+    assert.match(testRoute, /database_timeout/);
     const openapi = readFileSync(join(ROOT, "app/api/openapi/route.ts"), "utf8");
     assert.equal(openapi.includes("/api/compare"), false);
     assert.equal(openapi.includes("compare:authenticated_test"), false);
