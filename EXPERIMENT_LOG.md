@@ -125,3 +125,15 @@ Append one concise entry per material experiment.
 - **Change made:** no new Action/schema change today; logged the measurable A/B design and current evidence. Existing bootstrap remains reversible with `RMF_SIGNUP_CREDITS=0`.
 - **Rollback:** set `RMF_SIGNUP_CREDITS=0`; no ledger rewrite required.
 - **Next:** add cohort/event telemetry before interpreting conversion, then compare activation and 7-day return across 0-credit vs 100-credit cohorts without changing paid Action classifications.
+
+### 2026-08-13 — Same-turn credit checkout + buy starter
+- **Surface:** GPT + Stripe Checkout
+- **Hypothesis:** Same-turn `createCreditCheckoutSession` on 402 / credits_required (no second yes) plus conversation starter `I want to buy Rate My Face credits` will produce the first Stripe Checkout Session.
+- **Variant A:** wait for a second buy confirmation after 402 (prior GPT_INSTRUCTIONS).
+- **Variant B:** MUST call checkout Action in the same 402 turn; paste Stripe URL unchanged; credits apply after webhook.
+- **Metric:** Stripe Checkout Sessions > 0.
+- **Evidence/source:** last 24h had 0 Checkout Sessions; 92 remaining credits on the one user are founder/signup grant, not purchases.
+- **Result:** pending paste of GPT_INSTRUCTIONS.md + OpenAPI 2.5.4 re-import after merge.
+- **Change made:** GPT instructions same-turn checkout; OpenAPI 2.5.4 stronger buy/balance descriptions; `getEntitlements` emits `checkout_action` + pack size when balance cannot cover next metered cost; buy-credits conversation starter. searchProduct stays FREE. Public Compare stays OFF. Stripe price IDs unchanged.
+- **Rollback:** revert this commit and re-paste prior GPT_INSTRUCTIONS / OpenAPI 2.5.3.
+- **Next:** monitor Stripe Checkout Sessions after instructions are pasted into the GPT editor.

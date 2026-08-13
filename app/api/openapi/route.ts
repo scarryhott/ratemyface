@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.3",
+      version: "2.5.4",
       description:
-        "FREE product links + credit-metered account learning. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 use checkout."
+        "FREE product links + credit-metered account learning. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
         post: {
           operationId: "searchProduct",
           summary: "FREE — get one Amazon recommendation link",
-          description: "FREE affiliate/product acquisition. Call for product recommendations. Not used for account learning.",
+          description:
+            "MUST call for every product or recommendation ask. FREE. Always paste returned affiliate_url unchanged as (paid link). Never invent ASIN, URL, price, or product identity. Not used for account learning.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/ProductRequest" } } }
@@ -41,8 +42,8 @@ export async function GET(request: NextRequest) {
           operationId: "getEntitlements",
           summary: "PAYMENT-INFRASTRUCTURE — get plan, entitlements, and credit balance",
           description:
-            "Returns plan (free|premium), credit balance, pack size, signup_bootstrap_credits, metered costs, and whether premium subscription checkout is configured. Call before paid Actions when balance/access is uncertain. Do not invent premium access.",
-          responses: { "200": { description: "Access, plan, and balance" } }
+            "MUST call when the user asks credit balance, or before paid Actions if balance is uncertain. Returns credits, pack size (100), and metered costs. If credits are 0 or below next metered cost, JSON includes checkout_action=createCreditCheckoutSession — then MUST call that Action the same turn.",
+          responses: { "200": { description: "Plan, credits, pack size; checkout_action when balance cannot cover next metered cost" } }
         }
       },
       "/api/billing/credits/checkout": {
@@ -50,9 +51,9 @@ export async function GET(request: NextRequest) {
           operationId: "createCreditCheckoutSession",
           summary: "PAYMENT-INFRASTRUCTURE — buy 100 Rate My Face credits",
           description:
-            "Stripe-hosted one-time checkout for a credit pack. Credits are granted only after verified webhook — never after redirect alone. Use when a paid Action returned credits_required and the user wants to buy credits.",
+            "MUST call in the SAME turn on HTTP 402 / credits_required, or when the user asks to buy Rate My Face credits. Stripe-hosted pack of 100. Paste checkout URL unchanged. Never collect cards. Credits apply after verified webhook, not after redirect.",
           responses: {
-            "200": { description: "Checkout URL" },
+            "200": { description: "Stripe-hosted checkout URL — paste unchanged; credits apply after webhook" },
             "503": { description: "Stripe not configured" }
           }
         }
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
           operationId: "getPersonalNetwork",
           summary: "REQUIRED for preference questions — fetch saved Rate My Face prefs (1; report 5)",
           description:
-            "Call FIRST when user asks preferences/memory/what you know about them. mode=profile. Do not answer from chat, Memory, or web. If found=false/empty also call getUserContext. Natural language is enough. Costs 1 (report=5). On 402 do not invent prefs.",
+            "Call FIRST when user asks preferences/memory/what you know about them. mode=profile. Do not answer from chat, Memory, or web. If found=false/empty also call getUserContext. Natural language is enough. Costs 1 (report=5). On 402 do not invent prefs; MUST call createCreditCheckoutSession same turn.",
           parameters: [
             {
               name: "mode",
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
           operationId: "updatePersonalNetwork",
           summary: "PAID/METERED — MUST call on explicit remember/consent (1 credit)",
           description:
-            "MUST call on explicit remember/save/store. Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Dual-writes legacy context. Server also records rmf_interactions and derives rmf_personal_recommendations when url/title is present. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1. On 402 do not claim saved.",
+            "MUST call on explicit remember/save/store. Prefer operation=update_profile with minimal profile incl. consent_personalization=true. Dual-writes legacy context. Server also records rmf_interactions and derives rmf_personal_recommendations when url/title is present. Ordinary chat is not storage — claim success only after Action succeeds. Costs 1. On 402 do not claim saved; MUST call createCreditCheckoutSession same turn.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/PersonalWriteRequest" } } }
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
           operationId: "getUserContext",
           summary: "PAID/METERED — call if getPersonalNetwork found=false/empty (1)",
           description:
-            "Legacy/mirror preference read. After getPersonalNetwork mode=profile returns found=false/empty/null, MUST call this same turn. Falls back to personal profile when legacy empty. Answer only from returned data. Costs 1 credit.",
+            "Legacy/mirror preference read. After getPersonalNetwork mode=profile returns found=false/empty/null, MUST call this same turn. Falls back to personal profile when legacy empty. Answer only from returned data. Costs 1 credit. On 402 MUST call createCreditCheckoutSession same turn.",
           responses: {
             "200": { description: "Context" },
             "402": {
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
           operationId: "saveUserContext",
           summary: "PAID/METERED — legacy remember/consent write; mirrors profile (1)",
           description:
-            "Legacy write for explicit remember/consent. Requires consent_personalization=true. Prefer updatePersonalNetwork update_profile; if used, dual-writes Personal Network profile. Costs 1. On 402 do not claim saved.",
+            "Legacy write for explicit remember/consent. Requires consent_personalization=true. Prefer updatePersonalNetwork update_profile; if used, dual-writes Personal Network profile. Costs 1. On 402 do not claim saved; MUST call createCreditCheckoutSession same turn.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/SaveUserContextRequest" } } }

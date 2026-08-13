@@ -78,7 +78,8 @@ Exact starter text that helps Action selection for Account Learning:
 1. `What do you know about my preferences?`
 2. `Remember that I prefer a natural professional look and short beard`
 3. `How many Rate My Face credits do I have?`
-4. `Recommend a product for my look`
+4. `I want to buy Rate My Face credits`
+5. `Recommend a product for my look`
 
 Monitor check: a **new chat** with starter (1) should show Allow/consent for `getPersonalNetwork` without the user saying “Call getPersonalNetwork”.
 
