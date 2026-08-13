@@ -1,5 +1,5 @@
 /**
- * Conversion contracts: same-turn credit checkout, OpenAPI 2.5.5, conversation starters.
+ * Conversion contracts: same-turn credit checkout, OpenAPI 2.5.6, conversation starters.
  * Run: node --experimental-strip-types --test lib/gptConversion.test.ts
  */
 import assert from "node:assert/strict";
@@ -73,14 +73,14 @@ describe("conversation starters in paste lists", () => {
   });
 });
 
-describe("OpenAPI 2.5.5 conversion descriptions", () => {
+describe("OpenAPI 2.5.6 conversion descriptions", () => {
   const openapi = read("app/api/openapi/route.ts");
   const health = read("app/api/health/route.ts");
 
-  it("bumps schema version to 2.5.5", () => {
-    assert.match(openapi, /version:\s*"2\.5\.5"/);
-    assert.match(health, /openapi_version:\s*"2\.5\.5"/);
-    assert.equal(openapi.includes("2.5.4"), false);
+  it("bumps schema version to 2.5.6", () => {
+    assert.match(openapi, /version:\s*"2\.5\.6"/);
+    assert.match(health, /openapi_version:\s*"2\.5\.6"/);
+    assert.equal(openapi.includes("2.5.5"), false);
   });
 
   it("keeps createCreditCheckoutSession and getEntitlements descriptions ≤300 chars and auto-invoke ready", () => {
@@ -114,6 +114,22 @@ describe("OpenAPI 2.5.5 conversion descriptions", () => {
     assert.match(compare, /400/);
     assert.match(compare, /createCreditCheckoutSession/);
     assert.match(compare, /No medical claims/);
+    assert.equal(openapi.includes("GPT_INSTRUCTIONS"), false);
+  });
+
+  it("adds appearancePlan and appearanceCheckin with ≤300 char descriptions and 401/402/400 gates", () => {
+    const plan = operationDescription(openapi, "appearancePlan");
+    const checkin = operationDescription(openapi, "appearanceCheckin");
+    assert.ok(plan.length <= 300, `appearancePlan desc is ${plan.length}`);
+    assert.ok(checkin.length <= 300, `appearanceCheckin desc is ${checkin.length}`);
+    assert.match(plan, /consent_appearance=true/);
+    assert.match(plan, /1 credit/);
+    assert.match(plan, /400/);
+    assert.match(plan, /createCreditCheckoutSession/);
+    assert.match(plan, /No medical claims/);
+    assert.match(checkin, /consent_appearance=true/);
+    assert.match(checkin, /1 credit/);
+    assert.match(checkin, /createCreditCheckoutSession/);
     assert.equal(openapi.includes("GPT_INSTRUCTIONS"), false);
   });
 });

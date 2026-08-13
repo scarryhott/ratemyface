@@ -156,8 +156,8 @@ export type DashboardV2 = {
     action_path?: string;
   };
   appearance_agent: {
-    status: "DISABLED" | "TESTING" | "LIVE";
-    enabled: false;
+    status: "DISABLED" | "TESTING" | "LIVE" | "PAID";
+    enabled: boolean;
     plans_total: MetricValue;
     plans_draft: MetricValue;
     plans_active: MetricValue;
@@ -168,6 +168,7 @@ export type DashboardV2 = {
     note: string;
     target_days: number;
     depends_on: string[];
+    action_path?: string;
   };
   social_providers: {
     status: "UNAVAILABLE" | "NOT_CONFIGURED" | "LIVE";
@@ -311,16 +312,17 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
     appearance_agent: {
       status: APPEARANCE_AGENT.dashboard_status,
       enabled: APPEARANCE_AGENT.enabled,
-      plans_total: metric(0, "Feature DISABLED — not LIVE paid coaching"),
-      plans_draft: metric(0, "Feature DISABLED"),
-      plans_active: unavailable("Feature DISABLED — active plans unavailable"),
-      checkins: unavailable("Feature DISABLED — check-ins unavailable until schema + gates ship"),
+      plans_total: metric(0, "Paid Action — schema not applied"),
+      plans_draft: metric(0, "Paid Action — schema not applied"),
+      plans_active: unavailable("Paid Action — active plans unavailable until schema is applied"),
+      checkins: unavailable("Paid Action — check-ins unavailable until schema is applied"),
       gate: APPEARANCE_AGENT.gate,
       future_tables: [...APPEARANCE_AGENT.tables],
       schema_ready: false,
       note: APPEARANCE_AGENT.note,
       target_days: APPEARANCE_AGENT.target_days,
-      depends_on: [...APPEARANCE_AGENT.depends_on]
+      depends_on: [...APPEARANCE_AGENT.depends_on],
+      action_path: APPEARANCE_AGENT.action_path
     },
     social_providers: {
       status: SOCIAL_PROVIDER_OAUTH.dashboard_status,
@@ -594,18 +596,18 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       );
     }
 
-    // Appearance Agent stays DISABLED (not LIVE paid coaching). When tables exist,
-    // report live empty counts (0); never invent nonzero activity.
+    // Appearance Agent is a paid Action (not LIVE unlimited coaching). When tables exist,
+    // report live counts; never invent nonzero activity.
     let appearancePlansTotal: MetricValue = metric(
       0,
-      "Feature DISABLED — plans table not applied · not LIVE paid coaching"
+      "Paid Action — plans table not applied · not LIVE unlimited coaching"
     );
-    let appearancePlansDraft: MetricValue = metric(0, "Feature DISABLED — plans table not applied");
+    let appearancePlansDraft: MetricValue = metric(0, "Paid Action — plans table not applied");
     let appearancePlansActive: MetricValue = unavailable(
-      "Feature DISABLED — active plans unavailable until gates ship"
+      "Paid Action — active plans unavailable until schema is applied"
     );
     let appearanceCheckins: MetricValue = unavailable(
-      "Feature DISABLED — check-ins unavailable until schema + learning/compare gates ship"
+      "Paid Action — check-ins unavailable until schema is applied"
     );
     if (hasAppearancePlans) {
       const rows = await tx`
@@ -617,22 +619,22 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       `;
       appearancePlansTotal = metric(
         asNumber(rows[0]?.total),
-        "Feature DISABLED — live plan count (expect 0) · not LIVE paid coaching"
+        "Paid Action — live plan count (not LIVE unlimited coaching)"
       );
       appearancePlansDraft = metric(
         asNumber(rows[0]?.draft),
-        "Feature DISABLED — live draft count"
+        "Paid Action — live draft count"
       );
       appearancePlansActive = metric(
         asNumber(rows[0]?.active),
-        "Feature DISABLED — live active count (expect 0)"
+        "Paid Action — live active count"
       );
     }
     if (hasAppearanceCheckins) {
       const rows = await tx`select count(*)::int as total from rmf_appearance_checkins`;
       appearanceCheckins = metric(
         asNumber(rows[0]?.total),
-        "Feature DISABLED — live check-in count (expect 0)"
+        "Paid Action — live check-in count"
       );
     }
 
@@ -801,7 +803,8 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         schema_ready: hasAppearancePlans && hasAppearanceCheckins,
         note: APPEARANCE_AGENT.note,
         target_days: APPEARANCE_AGENT.target_days,
-        depends_on: [...APPEARANCE_AGENT.depends_on]
+        depends_on: [...APPEARANCE_AGENT.depends_on],
+        action_path: APPEARANCE_AGENT.action_path
       },
       social_providers: {
         status: SOCIAL_PROVIDER_OAUTH.dashboard_status,

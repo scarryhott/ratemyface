@@ -19,7 +19,7 @@ export type BusinessMetricsSnapshot = {
   agent_signals_queued: number | null;
   pending_approvals: number | null;
   compare_enabled: false;
-  /** Appearance Agent product path — always false until learning + compare gates met. */
+  /** False = not LIVE unlimited coaching. Paid appearance Actions are separate. */
   appearance_agent_enabled: false;
   credits_per_pack: number;
   signup_credits: number;
@@ -162,6 +162,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
   notes.push("ChatGPT chat counts and Amazon Associates live revenue are not ingested — leave Unavailable rather than inventing.");
   notes.push("Account Learning pipeline writes rmf_interactions and derives rmf_personal_recommendations on paid Personal Network saves.");
   notes.push("Paid Compare Me To Me Action is credit-metered (OAuth + consent_compare + real image refs). Vision is limited; do not claim LIVE unlimited vision. Unauthenticated compare is not free.");
+  notes.push("Paid Appearance Agent Actions are credit-metered (OAuth + consent_appearance + Account Learning + Compare history). Do not claim LIVE unlimited coaching. Unauthenticated appearance is not free.");
   return base;
 }
 
@@ -282,7 +283,7 @@ export function businessImproveGoal(): string {
     "Propose one reversible next step at minimum authority.",
     "Return JSON including business_impact:{bottleneck,hypothesis,recommended_next_step,expected_metric_effect,funnel_stage,confidence}.",
     "Do not invent ChatGPT chat counts, Amazon revenue, or Stripe USD. Label missing sources Unavailable.",
-    "Compare Me To Me is a paid credit-metered Action (vision limited; not a LIVE marketing claim). Appearance Agent stays DISABLED (not LIVE paid coaching).",
+    "Compare Me To Me and Appearance Agent are paid credit-metered Actions (not LIVE unlimited vision/coaching claims). Unauthenticated compare/appearance are not free.",
     "Prefer Account Learning + credit economy closure over new features.",
     "Report clearly how the recommended strategy helps the business."
   ].join(" ");

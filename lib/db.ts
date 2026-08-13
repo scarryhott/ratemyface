@@ -14,6 +14,8 @@ export const DB_OPERATION_TIMEOUT_MS = 12_000;
 export const COMPARE_TEST_DB_TIMEOUT_MS = 12_000;
 /** Paid Compare Action: DB + bounded vision attempt (still far below 300s). */
 export const COMPARE_ACTION_TIMEOUT_MS = 20_000;
+/** Paid Appearance Actions: DB-only plan/check-in (no vision). */
+export const APPEARANCE_ACTION_TIMEOUT_MS = 12_000;
 
 export class DatabaseTimeoutError extends Error {
   readonly timeoutMs: number;

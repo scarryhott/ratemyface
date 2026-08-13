@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     openapi: "3.1.0",
     info: {
       title: "Rate My Face Actions API",
-      version: "2.5.5",
+      version: "2.5.6",
       description:
-        "FREE product links + credit-metered account learning and Compare Me To Me. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
+        "FREE product links + credit-metered account learning, Compare Me To Me, and Appearance. Preference/memory questions → MUST call getPersonalNetwork before answering (then getUserContext if empty). Never answer prefs from chat/Memory/web. Remember/consent → MUST write Actions. Dual-write syncs stores. On 402 MUST call createCreditCheckoutSession same turn."
     },
     servers: [{ url: origin }],
     security: [{ rateMyFaceOAuth: [] }],
@@ -156,6 +156,48 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+      },
+      "/api/appearance": {
+        post: {
+          operationId: "appearancePlan",
+          summary: "PAID/METERED — 90-day professional-image plan (1 credit)",
+          description:
+            "PAID — 90-day professional-image plan from Account Learning + Compare history. OAuth, consent_appearance=true, and required history. Costs 1 credit (same unit as Personal Network). Missing history returns 400, never invented coaching. On 402 MUST call createCreditCheckoutSession same turn. No medical claims.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AppearancePlanRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted 90-day plan from stored history" },
+            "400": { description: "Missing consent_appearance or required Account Learning / Compare history" },
+            "401": { description: "OAuth required — not a free anonymous appearance product" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        }
+      },
+      "/api/appearance/plans": {
+        post: {
+          operationId: "appearanceCheckin",
+          summary: "PAID/METERED — Appearance plan check-in (1 credit)",
+          description:
+            "PAID — Appearance plan check-in from stored history. OAuth, consent_appearance=true, and an existing plan required. Costs 1 credit. Missing plan/history returns 400, never invented coaching or medical claims. On 402 MUST call createCreditCheckoutSession same turn.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AppearanceCheckinRequest" } } }
+          },
+          responses: {
+            "200": { description: "Persisted check-in recap from stored history" },
+            "400": { description: "Missing consent_appearance, plan, or required history" },
+            "401": { description: "OAuth required — not a free anonymous appearance product" },
+            "402": {
+              description: "Credits required",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/CreditsRequiredResponse" } } }
+            }
+          }
+        }
       }
     },
     components: {
@@ -225,6 +267,39 @@ export async function GET(request: NextRequest) {
             url: { type: "string", format: "uri" },
             recommendation_id: { type: "integer" },
             feedback: { type: "string", maxLength: 200 }
+          }
+        },
+        AppearancePlanRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["consent_appearance"],
+          properties: {
+            consent_appearance: {
+              type: "boolean",
+              const: true,
+              description: "Must be true. Explicit consent to record a 90-day professional-image plan from stored history."
+            },
+            goal: {
+              type: "string",
+              maxLength: 200,
+              description: "Optional label. Defaults to professional image. Not coaching or medical advice."
+            }
+          }
+        },
+        AppearanceCheckinRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["consent_appearance"],
+          properties: {
+            consent_appearance: {
+              type: "boolean",
+              const: true,
+              description: "Must be true. Explicit consent to record an appearance check-in from stored history."
+            },
+            plan_id: {
+              type: "integer",
+              description: "Optional. Existing appearance plan id. Uses the active plan when omitted."
+            }
           }
         },
         CompareRequest: {

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  APPEARANCE_ACTION_TIMEOUT_MS,
   COMPARE_ACTION_TIMEOUT_MS,
   COMPARE_TEST_DB_TIMEOUT_MS,
   DatabaseTimeoutError,
@@ -82,6 +83,22 @@ describe("compare POST hang regression (no live DB)", () => {
     const getHandler = testRoute.slice(testRoute.indexOf("export async function GET"), testRoute.indexOf("export async function POST"));
     assert.equal(getHandler.includes("withDatabaseTimeout"), false);
     assert.equal(getHandler.includes("readCompareLearningSnapshot"), false);
+  });
+
+  it("POST /api/appearance (paid Actions) bound work and map timeout to 504", () => {
+    const plan = readFileSync(join(ROOT, "app/api/appearance/route.ts"), "utf8");
+    const checkin = readFileSync(join(ROOT, "app/api/appearance/plans/route.ts"), "utf8");
+    for (const route of [plan, checkin]) {
+      assert.match(route, /withDatabaseTimeout/);
+      assert.match(route, /APPEARANCE_ACTION_TIMEOUT_MS/);
+      assert.match(route, /database_timeout/);
+      assert.match(route, /status:\s*504/);
+      assert.match(route, /oauth_required/);
+    }
+    assert.match(plan, /consumeCredits/);
+    assert.match(checkin, /consumeCredits/);
+    assert.ok(APPEARANCE_ACTION_TIMEOUT_MS <= 15_000);
+    assert.ok(APPEARANCE_ACTION_TIMEOUT_MS < 30_000);
   });
 
   it("POST /api/compare (paid Action) bounds work and maps timeout to 504", () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APPEARANCE_AGENT } from "../../../lib/appearanceAgent";
+import { APPEARANCE_ACTION_COST, APPEARANCE_AGENT } from "../../../lib/appearanceAgent";
 import { COMPARE_ACTION_COST, COMPARE_ME_TO_ME, COMPARE_TEST_ACTION_COST } from "../../../lib/compareFeature";
 import { databaseConfigured } from "../../../lib/db";
 import { SOCIAL_PROVIDER_OAUTH } from "../../../lib/providerConnections";
@@ -31,7 +31,8 @@ export async function GET() {
       credits_per_pack: 100,
       metered_memory_cost: 1,
       compare_authenticated_test_cost: COMPARE_TEST_ACTION_COST,
-      compare_me_to_me_cost: COMPARE_ACTION_COST
+      compare_me_to_me_cost: COMPARE_ACTION_COST,
+      appearance_agent_cost: APPEARANCE_ACTION_COST
     },
     compare_me_to_me: {
       // Paid OpenAPI Action. Unauthenticated compare is not free. Not a LIVE vision claim.
@@ -45,13 +46,16 @@ export async function GET() {
       public_unauthenticated: "401 oauth_required"
     },
     appearance_agent: {
-      // FEATURE REMAINS DISABLED — not LIVE paid coaching; schema may exist.
+      // Paid OpenAPI Actions. Unauthenticated appearance is not free. Not a LIVE coaching claim.
       enabled: APPEARANCE_AGENT.enabled,
       status: APPEARANCE_AGENT.status,
       note: APPEARANCE_AGENT.note,
       tables: [...APPEARANCE_AGENT.tables],
       target_days: APPEARANCE_AGENT.target_days,
-      depends_on: [...APPEARANCE_AGENT.depends_on]
+      depends_on: [...APPEARANCE_AGENT.depends_on],
+      action_path: APPEARANCE_AGENT.action_path,
+      checkin_path: APPEARANCE_AGENT.checkin_path,
+      public_unauthenticated: "401 oauth_required"
     },
     social_providers: {
       // NO LIVE OAUTH until secrets configured — skeleton / stubs only.
@@ -64,13 +68,14 @@ export async function GET() {
       table: SOCIAL_PROVIDER_OAUTH.table
     },
     account_learning: {
-      openapi_version: "2.5.5",
+      openapi_version: "2.5.6",
       profile_empty_shape: "found=false + preferences={}",
       retrieve_action: "getPersonalNetwork",
       pipeline: "rmf_interactions → rmf_personal_recommendations",
       compare_test_link: "opt-in RMF_COMPARE_TEST_LINK=1 queued linker only; not anonymous compare",
       compare_authenticated_test: "POST /api/compare/test (OAuth/operator, 1 credit); internal history placeholder",
-      compare_action: "POST /api/compare compareMeToMe (OAuth + 1 credit + consent_compare + image refs)"
+      compare_action: "POST /api/compare compareMeToMe (OAuth + 1 credit + consent_compare + image refs)",
+      appearance_action: "POST /api/appearance appearancePlan + POST /api/appearance/plans appearanceCheckin (OAuth + 1 credit + consent_appearance + required history)"
     },
     partner_tag: "ratemyfacegpt-20"
   });

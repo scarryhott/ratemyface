@@ -3,9 +3,10 @@
  * → rmf_personal_recommendations (when a product URL/title is available).
  *
  * Paid Compare Me To Me Action lives at POST /api/compare (OpenAPI compareMeToMe).
+ * Paid Appearance Actions live at POST /api/appearance and POST /api/appearance/plans.
  * A queued compare job with source_interaction_id is created only when
  * RMF_COMPARE_TEST_LINK=1. The internal history test lives at POST /api/compare/test.
- * Unauthenticated compare is not a free product.
+ * Unauthenticated compare/appearance is not a free product.
  */
 import {
   asRecord,
