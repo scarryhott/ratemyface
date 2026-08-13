@@ -29,7 +29,7 @@ The billing layer maintains subscription-compatible tables plus the active credi
 - `rmf_credit_accounts`
 - `rmf_credit_ledger`
 
-Current code defaults to 100 credits per pack and meters ordinary persistent memory/personal-network operations at 1 credit; reporting may cost more as declared by the endpoint.
+Current code defaults to 100 credits per pack and meters ordinary persistent memory/personal-network operations at 1 credit; reporting may cost more as declared by the endpoint. The authenticated Compare Me To Me **TEST** path (`POST /api/compare/test`) also costs **1 credit** (`compare:authenticated_test`) — history-placeholder analysis, not live vision. It is not an OpenAPI Action; public `/api/compare` stays `503 compare_disabled`.
 
 **Account Learning testing (no Stripe purchase required):**
 1. **Preferred:** founder grant on `/operator/dashboard` → Founder grant (calls `grantCredits` → `rmf_credit_ledger`).

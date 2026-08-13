@@ -245,7 +245,7 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
         profiles_created: unavailable("Database not configured"),
         interactions_stored: unavailable("Database not configured"),
         recommendations_stored: unavailable("Database not configured"),
-        compare_jobs: metric(0, "Compare Me To Me DISABLED — no live jobs"),
+        compare_jobs: metric(0, "Compare Me To Me TESTING — public DISABLED, no live jobs"),
         social_connections: unavailable("Database not configured")
       }
     },
@@ -296,10 +296,10 @@ function emptyDashboard(ops: Awaited<ReturnType<typeof getOperatorOpsRead>>): Da
     compare_me_to_me: {
       status: COMPARE_ME_TO_ME.dashboard_status,
       enabled: COMPARE_ME_TO_ME.enabled,
-      jobs_queued: metric(0, "Feature DISABLED"),
-      jobs_running: metric(0, "Feature DISABLED"),
-      jobs_completed: metric(0, "Feature DISABLED"),
-      results: unavailable("Feature DISABLED — no results until image storage + consent + history exist"),
+      jobs_queued: metric(0, "TESTING — public DISABLED"),
+      jobs_running: metric(0, "TESTING — public DISABLED"),
+      jobs_completed: metric(0, "TESTING — public DISABLED"),
+      results: unavailable("TESTING — public DISABLED; results unavailable until schema is applied"),
       gate: COMPARE_ME_TO_ME.gate,
       future_tables: [...COMPARE_ME_TO_ME.tables],
       schema_ready: false
@@ -559,13 +559,13 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         })()
       : unavailable("learning_events table not shipped yet");
 
-    // Feature stays DISABLED. When tables exist, report live empty counts (0),
-    // never invent nonzero activity. When missing, keep 0 / Unavailable.
-    let compareQueued: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
-    let compareRunning: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
-    let compareCompleted: MetricValue = metric(0, "Feature DISABLED — jobs table not applied");
+    // Public feature stays DISABLED. Authenticated test path may persist jobs.
+    // When tables exist, report live counts (0 or more) — never invent numbers.
+    let compareQueued: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
+    let compareRunning: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
+    let compareCompleted: MetricValue = metric(0, "TESTING — jobs table not applied (public DISABLED)");
     let compareResults: MetricValue = unavailable(
-      "Feature DISABLED — results unavailable until schema + consent path ship"
+      "TESTING — public DISABLED; results unavailable until schema is applied"
     );
     if (hasCompareJobs) {
       const rows = await tx`
@@ -575,18 +575,18 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           count(*) filter (where status = 'completed')::int as completed
         from rmf_compare_jobs
       `;
-      compareQueued = metric(asNumber(rows[0]?.queued), "Feature DISABLED — live queued count");
-      compareRunning = metric(asNumber(rows[0]?.running), "Feature DISABLED — live running count");
+      compareQueued = metric(asNumber(rows[0]?.queued), "TESTING — live queued count (public DISABLED)");
+      compareRunning = metric(asNumber(rows[0]?.running), "TESTING — live running count (public DISABLED)");
       compareCompleted = metric(
         asNumber(rows[0]?.completed),
-        "Feature DISABLED — live completed count"
+        "TESTING — live completed count (public DISABLED)"
       );
     }
     if (hasCompareResults) {
       const rows = await tx`select count(*)::int as total from rmf_compare_results`;
       compareResults = metric(
         asNumber(rows[0]?.total),
-        "Feature DISABLED — live results count (expect 0)"
+        "TESTING — live results count (public DISABLED)"
       );
     }
 
@@ -713,7 +713,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
           recommendations_stored: recommendations,
           compare_jobs: hasCompareJobs
             ? compareCompleted
-            : metric(0, "Compare Me To Me DISABLED — jobs table not applied"),
+            : metric(0, "Compare Me To Me TESTING — jobs table not applied (public DISABLED)"),
           social_connections: socialConnections
         }
       },

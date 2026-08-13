@@ -12,6 +12,7 @@ import {
   stripeSecretConfigured,
   stripeWebhookConfigured
 } from "../../../../lib/stripeBilling";
+import { COMPARE_TEST_ACTION_COST } from "../../../../lib/compareFeature";
 import { PERSONAL_ACTION_COST, REPORT_ACTION_COST } from "../../../../lib/personalNetwork";
 
 export const runtime = "nodejs";
@@ -39,7 +40,8 @@ export async function GET(request: NextRequest) {
     metered_costs: {
       personal_network: PERSONAL_ACTION_COST,
       memory_context: MEMORY_CONTEXT_COST,
-      report: REPORT_ACTION_COST
+      report: REPORT_ACTION_COST,
+      compare_authenticated_test: COMPARE_TEST_ACTION_COST
     },
     credit_checkout_available: creditCheckoutAvailable,
     subscription_available: subscriptionAvailable,

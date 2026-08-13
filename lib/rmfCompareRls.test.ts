@@ -102,8 +102,8 @@ describe("rmf compare RLS migration (policy matrix)", () => {
 describe("compare feature gate stays off", () => {
   it("COMPARE_ME_TO_ME.enabled is false", () => {
     assert.equal(COMPARE_ME_TO_ME.enabled, false);
-    assert.equal(COMPARE_ME_TO_ME.status, "requires_account_learning");
-    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "DISABLED");
+    assert.equal(COMPARE_ME_TO_ME.status, "testing");
+    assert.equal(COMPARE_ME_TO_ME.dashboard_status, "TESTING");
   });
 
   it("health route still reports compare disabled via gate constant", () => {

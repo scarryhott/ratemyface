@@ -87,7 +87,7 @@ describe("defaultInteractionSummary", () => {
 describe("feature gates stay off", () => {
   it("Compare Me To Me remains disabled with 503 stub body", () => {
     assert.equal(COMPARE_ME_TO_ME.enabled, false);
-    assert.equal(COMPARE_ME_TO_ME.status, "requires_account_learning");
+    assert.equal(COMPARE_ME_TO_ME.status, "testing");
     const stub = compareDisabledResponse(503);
     assert.equal(stub.status, 503);
     assert.equal(stub.body.enabled, false);
@@ -121,13 +121,15 @@ describe("pipeline wiring (source files)", () => {
     assert.equal(product.includes("saveRecommendation"), false);
   });
 
-  it("/api/compare remains a 503 stub (no job enqueue)", () => {
+  it("/api/compare remains a 503 stub (no job enqueue); test path is /api/compare/test", () => {
     const compare = readFileSync(join(ROOT, "app/api/compare/route.ts"), "utf8");
     const jobs = readFileSync(join(ROOT, "app/api/compare/jobs/route.ts"), "utf8");
     assert.match(compare, /compareDisabledResponse\(503\)/);
     assert.match(jobs, /compareDisabledResponse\(503\)/);
     assert.equal(compare.includes("maybeLinkDisabledCompareJob"), false);
     assert.equal(jobs.includes("maybeLinkDisabledCompareJob"), false);
+    const testRoute = readFileSync(join(ROOT, "app/api/compare/test/route.ts"), "utf8");
+    assert.match(testRoute, /runAuthenticatedCompareTest/);
   });
 
   it("health still reports compare disabled and documents the learning pipeline", () => {
