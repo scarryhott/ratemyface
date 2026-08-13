@@ -11,7 +11,7 @@ import {
   type ProductionHealthEvidence
 } from "./agentFeatureBacklog";
 import { databaseConfigured, db } from "./db";
-import { ensureOperatorSchema } from "./operatorAgent";
+import { existingPublicTables } from "./operatorOpsRead";
 import { creditsPerPack, signupCredits } from "./stripeBilling";
 import type { OperatorModelPlan } from "./operatorClosure";
 
@@ -59,15 +59,6 @@ export type BusinessStrategyReport = {
   status: string;
   closure_state: string | null;
 };
-
-async function tableExists(sql: any, name: string): Promise<boolean> {
-  const rows = await sql`
-    select 1 from information_schema.tables
-    where table_schema = 'public' and table_name = ${name}
-    limit 1
-  `;
-  return rows.length > 0;
-}
 
 function asNumber(value: unknown): number | null {
   if (value == null) return null;
@@ -142,8 +133,19 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     return base;
   }
 
-  await ensureOperatorSchema();
   const sql = db();
+  let existing = new Set<string>();
+  try {
+    existing = await existingPublicTables(sql, [
+      "rmf_personal_profiles",
+      "rmf_interactions",
+      "rmf_personal_recommendations",
+      "rmf_credit_accounts",
+      "rmf_stripe_events"
+    ]);
+  } catch {
+    notes.push("information_schema table lookup failed");
+  }
 
   try {
     const auth = await sql`select count(*)::int as total from auth.users`;
@@ -159,22 +161,22 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     notes.push("rmf_oauth_tokens unavailable");
   }
 
-  if (await tableExists(sql, "rmf_personal_profiles")) {
+  if (existing.has("rmf_personal_profiles")) {
     const rows = await sql`select count(*)::int as total from rmf_personal_profiles`;
     base.personal_profiles = asNumber(rows[0]?.total);
   } else notes.push("rmf_personal_profiles missing");
 
-  if (await tableExists(sql, "rmf_interactions")) {
+  if (existing.has("rmf_interactions")) {
     const rows = await sql`select count(*)::int as total from rmf_interactions`;
     base.interactions = asNumber(rows[0]?.total);
   } else notes.push("rmf_interactions missing");
 
-  if (await tableExists(sql, "rmf_personal_recommendations")) {
+  if (existing.has("rmf_personal_recommendations")) {
     const rows = await sql`select count(*)::int as total from rmf_personal_recommendations`;
     base.personal_recommendations = asNumber(rows[0]?.total);
   } else notes.push("rmf_personal_recommendations missing");
 
-  if (await tableExists(sql, "rmf_credit_accounts")) {
+  if (existing.has("rmf_credit_accounts")) {
     const rows = await sql`
       select coalesce(sum(balance),0)::bigint as balance,
              coalesce(sum(lifetime_purchased),0)::bigint as purchased,
@@ -186,7 +188,7 @@ export async function snapshotBusinessMetrics(): Promise<BusinessMetricsSnapshot
     base.lifetime_spent = asNumber(rows[0]?.spent);
   } else notes.push("rmf_credit_accounts missing");
 
-  if (await tableExists(sql, "rmf_stripe_events")) {
+  if (existing.has("rmf_stripe_events")) {
     const rows = await sql`select count(*)::int as total from rmf_stripe_events`;
     base.stripe_events = asNumber(rows[0]?.total);
   }
@@ -239,28 +241,31 @@ export function extractBusinessImpact(
   };
 }
 
-/** Persist latest + history strategy reports for dashboard visibility. */
+/** Persist latest + history strategy reports for dashboard visibility. No schema DDL. */
 export async function writeStrategyReport(
   report: BusinessStrategyReport
 ): Promise<BusinessStrategyReport> {
-  await ensureOperatorSchema();
-  const sql = db();
-  await sql`
-    insert into rmf_agent_context(key, value, updated_at)
-    values('business_strategy:latest', ${sql.json(report as any)}, now())
-    on conflict(key) do update set value = excluded.value, updated_at = now()
-  `;
+  try {
+    const sql = db();
+    await sql`
+      insert into rmf_agent_context(key, value, updated_at)
+      values('business_strategy:latest', ${sql.json(report as any)}, now())
+      on conflict(key) do update set value = excluded.value, updated_at = now()
+    `;
 
-  const historyRows = await sql`
-    select value from rmf_agent_context where key = 'business_strategy:history' limit 1
-  `;
-  const existing = Array.isArray(historyRows[0]?.value) ? (historyRows[0].value as any[]) : [];
-  const next = [report, ...existing].slice(0, 40);
-  await sql`
-    insert into rmf_agent_context(key, value, updated_at)
-    values('business_strategy:history', ${sql.json(next as any)}, now())
-    on conflict(key) do update set value = excluded.value, updated_at = now()
-  `;
+    const historyRows = await sql`
+      select value from rmf_agent_context where key = 'business_strategy:history' limit 1
+    `;
+    const existing = Array.isArray(historyRows[0]?.value) ? (historyRows[0].value as any[]) : [];
+    const next = [report, ...existing].slice(0, 40);
+    await sql`
+      insert into rmf_agent_context(key, value, updated_at)
+      values('business_strategy:history', ${sql.json(next as any)}, now())
+      on conflict(key) do update set value = excluded.value, updated_at = now()
+    `;
+  } catch {
+    /* worker hot path must still return even if context persist fails */
+  }
   return report;
 }
 
@@ -269,23 +274,26 @@ export async function readStrategyReports(limit = 12): Promise<{
   history: BusinessStrategyReport[];
 }> {
   if (!databaseConfigured()) return { latest: null, history: [] };
-  await ensureOperatorSchema();
-  const sql = db();
-  const latestRows = await sql`
-    select value, updated_at from rmf_agent_context where key = 'business_strategy:latest' limit 1
-  `;
-  const historyRows = await sql`
-    select value from rmf_agent_context where key = 'business_strategy:history' limit 1
-  `;
-  const latest = latestRows[0]?.value
-    ? ({ ...(latestRows[0].value as object), created_at: String((latestRows[0].value as any).created_at || latestRows[0].updated_at) } as BusinessStrategyReport)
-    : null;
-  const history = Array.isArray(historyRows[0]?.value)
-    ? (historyRows[0].value as BusinessStrategyReport[]).slice(0, Math.min(Math.max(limit, 1), 40))
-    : latest
-      ? [latest]
-      : [];
-  return { latest, history };
+  try {
+    const sql = db();
+    const latestRows = await sql`
+      select value, updated_at from rmf_agent_context where key = 'business_strategy:latest' limit 1
+    `;
+    const historyRows = await sql`
+      select value from rmf_agent_context where key = 'business_strategy:history' limit 1
+    `;
+    const latest = latestRows[0]?.value
+      ? ({ ...(latestRows[0].value as object), created_at: String((latestRows[0].value as any).created_at || latestRows[0].updated_at) } as BusinessStrategyReport)
+      : null;
+    const history = Array.isArray(historyRows[0]?.value)
+      ? (historyRows[0].value as BusinessStrategyReport[]).slice(0, Math.min(Math.max(limit, 1), 40))
+      : latest
+        ? [latest]
+        : [];
+    return { latest, history };
+  } catch {
+    return { latest: null, history: [] };
+  }
 }
 
 export async function recordStrategyFromRun(input: {
@@ -351,33 +359,42 @@ export type FeatureBacklogConsole = {
 
 export async function readFeatureReceipts(): Promise<FeatureReceipt[]> {
   if (!databaseConfigured()) return [];
-  await ensureOperatorSchema();
   const sql = db();
-  const rows = await sql`select value from rmf_agent_context where key = ${BACKLOG_RECEIPTS_KEY} limit 1`;
-  return Array.isArray(rows[0]?.value) ? (rows[0].value as FeatureReceipt[]) : [];
+  try {
+    const rows = await sql`select value from rmf_agent_context where key = ${BACKLOG_RECEIPTS_KEY} limit 1`;
+    return Array.isArray(rows[0]?.value) ? (rows[0].value as FeatureReceipt[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function appendFeatureReceipt(receipt: FeatureReceipt): Promise<FeatureReceipt> {
-  await ensureOperatorSchema();
-  const sql = db();
-  const existing = await readFeatureReceipts();
-  const next = [receipt, ...existing.filter((r) => r.id !== receipt.id)].slice(0, 80);
-  await sql`
-    insert into rmf_agent_context(key, value, updated_at)
-    values(${BACKLOG_RECEIPTS_KEY}, ${sql.json(next as any)}, now())
-    on conflict(key) do update set value = excluded.value, updated_at = now()
-  `;
+  try {
+    const sql = db();
+    const existing = await readFeatureReceipts();
+    const next = [receipt, ...existing.filter((r) => r.id !== receipt.id)].slice(0, 80);
+    await sql`
+      insert into rmf_agent_context(key, value, updated_at)
+      values(${BACKLOG_RECEIPTS_KEY}, ${sql.json(next as any)}, now())
+      on conflict(key) do update set value = excluded.value, updated_at = now()
+    `;
+  } catch {
+    /* worker hot path must still return the in-memory receipt */
+  }
   return receipt;
 }
 
 export async function writeFeatureBacklogState(state: FeatureBacklogConsole): Promise<FeatureBacklogConsole> {
-  await ensureOperatorSchema();
-  const sql = db();
-  await sql`
-    insert into rmf_agent_context(key, value, updated_at)
-    values(${BACKLOG_STATE_KEY}, ${sql.json(state as any)}, now())
-    on conflict(key) do update set value = excluded.value, updated_at = now()
-  `;
+  try {
+    const sql = db();
+    await sql`
+      insert into rmf_agent_context(key, value, updated_at)
+      values(${BACKLOG_STATE_KEY}, ${sql.json(state as any)}, now())
+      on conflict(key) do update set value = excluded.value, updated_at = now()
+    `;
+  } catch {
+    /* console persist is best-effort */
+  }
   return state;
 }
 

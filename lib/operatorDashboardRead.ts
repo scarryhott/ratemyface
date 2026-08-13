@@ -4,6 +4,7 @@ import { databaseConfigured, db } from "./db";
 import { metric, unavailable, type MetricValue } from "./metricValue";
 import {
   getOperatorOpsRead,
+  existingPublicTables,
   infrastructureCreditBoundary,
   unavailableOperatorOpsRead
 } from "./operatorOpsRead";
@@ -16,16 +17,6 @@ import {
 function asNumber(value: unknown): number {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
-}
-
-async function tableExists(tx: any, name: string): Promise<boolean> {
-  const rows = await tx`
-    select 1
-    from information_schema.tables
-    where table_schema = 'public' and table_name = ${name}
-    limit 1
-  `;
-  return rows.length > 0;
 }
 
 function deploySha(): string | null {
@@ -436,19 +427,34 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
     await tx`set local statement_timeout = '4000ms'`;
     await tx`set local lock_timeout = '1500ms'`;
 
-    const hasCredits = await tableExists(tx, "rmf_credit_accounts");
-    const hasLedger = await tableExists(tx, "rmf_credit_ledger");
-    const hasStripeEvents = await tableExists(tx, "rmf_stripe_events");
-    const hasProfiles = await tableExists(tx, "rmf_personal_profiles");
-    const hasInteractions = await tableExists(tx, "rmf_interactions");
-    const hasRecs = await tableExists(tx, "rmf_personal_recommendations");
-    const hasProviders = await tableExists(tx, "rmf_provider_connections");
-    const hasUsers = await tableExists(tx, "rmf_users");
-    const hasCompareJobs = await tableExists(tx, "rmf_compare_jobs");
-    const hasCompareResults = await tableExists(tx, "rmf_compare_results");
-    const hasAppearancePlans = await tableExists(tx, "rmf_appearance_plans");
-    const hasAppearanceCheckins = await tableExists(tx, "rmf_appearance_checkins");
-    const hasLearningEvents = await tableExists(tx, "rmf_learning_events");
+    const existing = await existingPublicTables(tx, [
+      "rmf_credit_accounts",
+      "rmf_credit_ledger",
+      "rmf_stripe_events",
+      "rmf_personal_profiles",
+      "rmf_interactions",
+      "rmf_personal_recommendations",
+      "rmf_provider_connections",
+      "rmf_users",
+      "rmf_compare_jobs",
+      "rmf_compare_results",
+      "rmf_appearance_plans",
+      "rmf_appearance_checkins",
+      "rmf_learning_events"
+    ]);
+    const hasCredits = existing.has("rmf_credit_accounts");
+    const hasLedger = existing.has("rmf_credit_ledger");
+    const hasStripeEvents = existing.has("rmf_stripe_events");
+    const hasProfiles = existing.has("rmf_personal_profiles");
+    const hasInteractions = existing.has("rmf_interactions");
+    const hasRecs = existing.has("rmf_personal_recommendations");
+    const hasProviders = existing.has("rmf_provider_connections");
+    const hasUsers = existing.has("rmf_users");
+    const hasCompareJobs = existing.has("rmf_compare_jobs");
+    const hasCompareResults = existing.has("rmf_compare_results");
+    const hasAppearancePlans = existing.has("rmf_appearance_plans");
+    const hasAppearanceCheckins = existing.has("rmf_appearance_checkins");
+    const hasLearningEvents = existing.has("rmf_learning_events");
 
     // Users / activity from auth + oauth
     let totalUsers = metric(asNumber(ops.accounts?.auth_users), "Supabase auth.users");
