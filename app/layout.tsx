@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Rate My Face",
-  description: "Product recommendation backend for the Rate My Face GPT."
+  description: "Your Rate My Face account for credits, personal history, comparisons, and appearance plans."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
