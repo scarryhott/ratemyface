@@ -77,8 +77,35 @@ function SummaryCard({ label, value, note }: { label: string; value: number; not
   );
 }
 
+function metricValue(data: UnifiedControl, source: string, metricKey: string) {
+  return data.monetary_snapshots.find((metric) => metric.source === source && metric.metric_key === metricKey);
+}
+
+function metricDisplay(metric: UnifiedControl["monetary_snapshots"][number] | undefined) {
+  if (!metric) return "—";
+  if (metric.text_value) return metric.text_value;
+  const numericValue = Number(metric.numeric_value);
+  return Number.isFinite(numericValue) ? numericValue.toLocaleString() : "—";
+}
+
+function FunnelStageCard({ label, value, note, tone }: { label: string; value: string; note: string; tone: string }) {
+  return (
+    <div style={{ padding: 16, border: "1px solid #eaecf0", borderTop: `4px solid ${tone}`, borderRadius: 10, background: "#fff" }}>
+      <div className="muted" style={{ fontSize: 12, fontWeight: 750, letterSpacing: 0.7, textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <strong style={{ display: "block", margin: "8px 0 5px", fontSize: 30, lineHeight: 1 }}>{value}</strong>
+      <small className="muted">{note}</small>
+    </div>
+  );
+}
+
 export function UnifiedControlSection({ data }: { data: UnifiedControl }) {
   const protectedGpt = data.gpt_factory.protected_gpt;
+  const chatCount = metricValue(data, "openai", "rate_my_face.chat_count_lower_bound");
+  const oauthUsers = metricValue(data, "supabase", "oauth.users");
+  const purchasedCredits = metricValue(data, "product", "credits.lifetime_purchased");
+  const hasActivationGap = Number(chatCount?.numeric_value) > 0 && Number(oauthUsers?.numeric_value) >= 0;
   return (
     <section style={{ marginTop: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -174,10 +201,30 @@ export function UnifiedControlSection({ data }: { data: UnifiedControl }) {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Monetary evidence ingestion</h3>
+        <h3 style={{ marginTop: 0 }}>Provider and funnel evidence</h3>
+        <p className="muted" style={{ marginTop: -4 }}>
+          Distribution, account activation, purchases, revenue, and cost remain separate evidence. They are not interchangeable.
+        </p>
+
+        <div style={{ ...grid4, gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", margin: "16px 0" }}>
+          <FunnelStageCard label="Minimum GPT chats" value={metricDisplay(chatCount)} note="Cumulative ChatGPT lower bound" tone="#111" />
+          <FunnelStageCard label="OAuth-linked accounts" value={metricDisplay(oauthUsers)} note="Accounts linked through product OAuth" tone="#f79009" />
+          <FunnelStageCard label="Purchased credits" value={metricDisplay(purchasedCredits)} note="Paid credits granted by Stripe webhook" tone="#b42318" />
+        </div>
+
+        {hasActivationGap && (
+          <div style={{ padding: "12px 14px", borderLeft: "4px solid #f79009", background: "#fffcf5", marginBottom: 16 }}>
+            <strong>First measured gap: GPT chat → OAuth account activation</strong>
+            <p className="muted" style={{ margin: "5px 0 0" }}>
+              The GPT chat count is cumulative conversations, not unique users or a same-window conversion denominator. It identifies the scale mismatch without manufacturing a conversion rate.
+            </p>
+          </div>
+        )}
+
+        <h4 style={{ margin: "18px 0 6px" }}>Latest provider snapshots</h4>
         {!data.monetary_snapshots.length ? (
           <p className="muted" style={{ marginBottom: 0 }}>
-            No unified provider snapshots yet. Existing Stripe credit counts remain visible below, but revenue, compute cost, and infrastructure cost are not treated as interchangeable.
+            No unified provider snapshots yet. Revenue, compute cost, infrastructure cost, and distribution are not inferred from missing data.
           </p>
         ) : (
           data.monetary_snapshots.slice(0, 12).map((metric) => (
