@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "verify:protected": "node scripts/verify-protected-assets.mjs",
     "test:account-learning": "node --experimental-strip-types --test lib/accountLearningShape.test.ts lib/accountLearningPipeline.test.ts lib/appearanceAgent.test.ts lib/compareJobs.test.ts lib/compareVision.test.ts lib/db.test.ts lib/featureDashboard.test.ts lib/gptConversion.test.ts lib/agentFeatureBacklog.test.ts lib/operatorQueue.test.ts lib/operatorWorker.test.ts lib/personalExperimentEvidence.test.ts lib/personalExperiments.test.ts lib/personalIntelligenceEvidence.test.ts lib/personalIntelligenceSuite.test.ts lib/providerConnections.test.ts",
     "test:rls": "node --experimental-strip-types --test lib/rmfPersonalBillingRls.test.ts lib/rmfCompareRls.test.ts lib/rmfProviderConnectionsRls.test.ts lib/rmfAppearanceAgentRls.test.ts lib/rmfPersonalExperimentsRls.test.ts lib/rmfPersonalIntelligenceRls.test.ts",
-    "test": "npm run test:account-learning && npm run test:rls"
+    "test:control-plane": "node --experimental-strip-types --test lib/unifiedControlPlane.test.ts",
+    "test": "npm run verify:protected && npm run test:account-learning && npm run test:rls && npm run test:control-plane"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

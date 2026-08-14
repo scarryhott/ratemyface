@@ -80,7 +80,7 @@ After deployment:
 1. Open `/api/openapi` on the production deployment and import/copy that schema into the GPT Action configuration.
 2. Configure Action authentication as a Bearer/API key using the same value stored in Vercel as `GPT_ACTION_SECRET`.
 3. Set the GPT privacy-policy URL to `/privacy` on the production deployment.
-4. Paste `GPT_INSTRUCTIONS.md` into the Custom GPT Instructions editor (keep ≤7900 chars). The file leads with a MUST retrieve block so preference questions auto-call `getPersonalNetwork`.
+4. Do not automate, synchronize, publish, paste, or modify the Rate My Face GPT instructions. Harry Scott alone maintains the live handwritten instructions manually; agents may only verify the protected repository files by hash.
 5. Require the GPT to call `searchProduct` and render `affiliate_url` unchanged.
 6. If `link_type` is `product`, it may use the returned title/ASIN. If `link_type` is `amazon_search`, describe the link only as Amazon results for the recommendation.
 
