@@ -13,6 +13,8 @@ import {
   databaseConfigured,
   withDatabaseTimeout
 } from "../../../lib/db";
+import { createCreditCheckout } from "../../../lib/creditCheckout";
+import { ensureSignupCreditGrant, getEntitlements, stripeCreditsPriceConfigured, stripeSecretConfigured, stripeWebhookConfigured } from "../../../lib/stripeBilling";
 
 export const runtime="nodejs"; export const maxDuration=60;
 const ORIGIN=process.env.RMF_PUBLIC_ORIGIN||"https://ratemyface.vercel.app";
@@ -20,6 +22,7 @@ async function control(action:string,url?:string){const secret=process.env.RMF_B
 const out=(x:unknown)=>({content:[{type:"text" as const,text:JSON.stringify(x)}],structuredContent:x as Record<string,unknown>});
 function personalMcpUserId(){if(!(process.env.RMF_CHATGPT_MCP_TOKEN||"").trim())throw new Error("RMF_CHATGPT_MCP_TOKEN_not_configured");const userId=(process.env.RMF_CHATGPT_MCP_USER_ID||"").trim();if(!userId)throw new Error("RMF_CHATGPT_MCP_USER_ID_not_configured");return userId}
 async function personalRead<T>(read:(userId:string)=>Promise<T>){if(!databaseConfigured())throw new Error("database_not_configured");return withDatabaseTimeout(async()=>{if(!(await personalIntelligenceTablesReady()))throw new Error("personal_intelligence_schema_missing");return read(personalMcpUserId())},PERSONAL_INTELLIGENCE_ACTION_TIMEOUT_MS)}
+async function scopedCreditEntitlements(){if(!databaseConfigured())throw new Error("database_not_configured");const userId=personalMcpUserId();await ensureSignupCreditGrant(userId);const entitlements=await getEntitlements(userId);return {...entitlements,credit_checkout_available:stripeSecretConfigured()&&stripeCreditsPriceConfigured()&&stripeWebhookConfigured(),scope:"RMF_CHATGPT_MCP_USER_ID"}}
 const mcpHandler=createMcpHandler(server=>{
  const ro={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:true};
  const personalRo={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false};
@@ -37,6 +40,8 @@ const mcpHandler=createMcpHandler(server=>{
  server.registerTool("personal_social_outcomes",{title:"Read Social Outcome Intelligence",description:"Read user-recorded or provider-authorized social metric trends. Never scrapes provider data.",inputSchema:{},annotations:personalRo},async()=>out(await personalRead(userId=>getSocialOutcomeIntelligence(userId))));
  server.registerTool("personal_reference_comparisons",{title:"Read Reference Comparisons",description:"Read distinct chosen reference comparisons with explicit insufficient, tied, or directional evidence states.",inputSchema:{comparison_id:z.number().int().positive().optional(),limit:z.number().int().min(1).max(50).optional()},annotations:personalRo},async({comparison_id,limit})=>out(await personalRead(userId=>readReferenceComparisons(userId,{comparison_id,limit}))));
  server.registerTool("personal_agent_status",{title:"Read Personal Agent Receipts",description:"Read bounded personal-agent runs, approval states, and verification receipts. This MCP surface cannot approve or execute writes.",inputSchema:{run_id:z.number().int().positive().optional(),limit:z.number().int().min(1).max(50).optional()},annotations:personalRo},async({run_id,limit})=>out(await personalRead(userId=>readPersonalAgentRuns(userId,{run_id,limit}))));
+ server.registerTool("get_scoped_credit_entitlements",{title:"Get Scoped Credit Entitlements",description:"Read the server-scoped account's Rate My Face credit balance and active entitlements. No purchase or state change occurs.",inputSchema:{},annotations:personalRo},async()=>out(await scopedCreditEntitlements()));
+ server.registerTool("create_scoped_credit_checkout_session",{title:"Create Scoped Credit Checkout",description:"Create a Stripe-hosted checkout URL for one 100-credit Rate My Face pack, scoped to the configured MCP account. This creates no charge; the account holder completes payment on Stripe.",inputSchema:{},annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:false,openWorldHint:false}},async()=>{const userId=personalMcpUserId();const checkout=await createCreditCheckout({userId,origin:ORIGIN,source:"mcp_credit_action"});return out({ok:true,...checkout,scope:"RMF_CHATGPT_MCP_USER_ID",note:"No charge has been made. Credits are granted only after Stripe payment and the verified webhook."})});
 },{},{basePath:"/api",maxDuration:60,verboseLogs:false});
 function authorized(request:Request){const expected=process.env.RMF_CHATGPT_MCP_TOKEN||"";if(!expected)return true;return request.headers.get("authorization")===`Bearer ${expected}`}
 async function guarded(request:Request){if(!authorized(request))return new Response(JSON.stringify({error:"unauthorized"}),{status:401,headers:{"content-type":"application/json"}});return mcpHandler(request)}
