@@ -251,3 +251,55 @@ export function normalizeGptFactoryRequest(input: Record<string, unknown>): GptF
     .digest("hex")).slice(0, 160);
   return { gpt_key: gptKey, name, configuration, idempotency_key: idempotencyKey };
 }
+
+export type BusinessMetricProjectionInput = {
+  captured_at: string;
+  auth_users: number | null;
+  oauth_users: number | null;
+  personal_profiles: number | null;
+  interactions: number | null;
+  personal_recommendations: number | null;
+  credit_balance_total: number | null;
+  lifetime_purchased: number | null;
+  lifetime_spent: number | null;
+  stripe_events: number | null;
+  agent_runs_7d: number | null;
+  agent_signals_queued: number | null;
+  pending_approvals: number | null;
+  credits_per_pack: number;
+  signup_credits: number;
+};
+
+export type UnifiedMetricSnapshotInput = {
+  source: "supabase" | "product" | "stripe";
+  metric_key: string;
+  numeric_value: number;
+  unit: "count" | "credits";
+};
+
+/** Project only authoritative counters. Revenue and cost require provider evidence. */
+export function projectBusinessMetricSnapshots(
+  snapshot: BusinessMetricProjectionInput
+): UnifiedMetricSnapshotInput[] {
+  const candidates: Array<Omit<UnifiedMetricSnapshotInput, "numeric_value"> & { numeric_value: number | null }> = [
+    { source: "supabase", metric_key: "auth.users", numeric_value: snapshot.auth_users, unit: "count" },
+    { source: "supabase", metric_key: "oauth.users", numeric_value: snapshot.oauth_users, unit: "count" },
+    { source: "supabase", metric_key: "personal.profiles", numeric_value: snapshot.personal_profiles, unit: "count" },
+    { source: "supabase", metric_key: "personal.interactions", numeric_value: snapshot.interactions, unit: "count" },
+    { source: "supabase", metric_key: "personal.recommendations", numeric_value: snapshot.personal_recommendations, unit: "count" },
+    { source: "product", metric_key: "credits.balance", numeric_value: snapshot.credit_balance_total, unit: "credits" },
+    { source: "product", metric_key: "credits.lifetime_purchased", numeric_value: snapshot.lifetime_purchased, unit: "credits" },
+    { source: "product", metric_key: "credits.lifetime_spent", numeric_value: snapshot.lifetime_spent, unit: "credits" },
+    { source: "stripe", metric_key: "webhook_events.processed", numeric_value: snapshot.stripe_events, unit: "count" },
+    { source: "supabase", metric_key: "agent.runs_7d", numeric_value: snapshot.agent_runs_7d, unit: "count" },
+    { source: "supabase", metric_key: "agent.signals_queued", numeric_value: snapshot.agent_signals_queued, unit: "count" },
+    { source: "supabase", metric_key: "agent.approvals_pending", numeric_value: snapshot.pending_approvals, unit: "count" },
+    { source: "product", metric_key: "credits.per_pack", numeric_value: snapshot.credits_per_pack, unit: "credits" },
+    { source: "product", metric_key: "credits.signup_grant", numeric_value: snapshot.signup_credits, unit: "credits" }
+  ];
+
+  return candidates.filter(
+    (metric): metric is UnifiedMetricSnapshotInput =>
+      metric.numeric_value != null && Number.isFinite(metric.numeric_value)
+  );
+}
