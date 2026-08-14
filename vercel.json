@@ -6,17 +6,8 @@
     "RMF_BROWSER_CONTROL_URL": "https://browser-runtime-production-307b.up.railway.app"
   },
   "crons": [
-    {
-      "path": "/api/operator/heartbeat",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/operator/run",
-      "schedule": "5 14 * * *"
-    },
-    {
-      "path": "/api/operator/closure",
-      "schedule": "10 14 * * *"
-    }
+    { "path": "/api/operator/heartbeat", "schedule": "0 14 * * *" },
+    { "path": "/api/operator/run", "schedule": "5 14 * * *" },
+    { "path": "/api/operator/closure", "schedule": "10 14 * * *" }
   ]
 }
