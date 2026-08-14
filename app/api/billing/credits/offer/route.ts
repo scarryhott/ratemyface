@@ -33,7 +33,15 @@ export async function GET() {
         }
       }
     );
-  } catch {
+  } catch (cause) {
+    const error = cause && typeof cause === "object"
+      ? cause as { type?: unknown; code?: unknown; statusCode?: unknown }
+      : {};
+    console.error("credit_offer_lookup_failed", {
+      type: typeof error.type === "string" ? error.type : "unknown",
+      code: typeof error.code === "string" ? error.code : "unknown",
+      status_code: typeof error.statusCode === "number" ? error.statusCode : null
+    });
     return NextResponse.json({ ok: false, error: "credit_offer_unavailable" }, { status: 502 });
   }
 }
