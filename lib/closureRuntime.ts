@@ -47,6 +47,7 @@ export type ClosureBuilderCandidate = {
   handwritten_content_write: boolean;
   requires_owner_session?: boolean;
   dependency_blocked?: boolean;
+  feature_evidence_verified?: boolean;
   time_critical?: boolean;
 };
 
@@ -147,7 +148,13 @@ function stableCursor(input: ClosureRuntimeInput, closure: BusinessClosure) {
       component: candidate.closure_component,
       target: candidate.exact_target,
       scores: [candidate.customer_value, candidate.revenue_potential, candidate.confidence, candidate.urgency],
-      constraints: [candidate.financial_mutation, candidate.protected_asset, candidate.handwritten_content_write, candidate.dependency_blocked]
+      constraints: [
+        candidate.financial_mutation,
+        candidate.protected_asset,
+        candidate.handwritten_content_write,
+        candidate.dependency_blocked,
+        candidate.feature_evidence_verified
+      ]
     }))
   };
   return createHash("sha256").update(JSON.stringify(stable)).digest("hex");
@@ -254,6 +261,7 @@ export function selectClosureRuntimeRound(input: ClosureRuntimeInput): ClosureRu
     if (candidate.financial_mutation || candidate.action === "external_financial") reasons.push("financial_action_not_admitted");
     if (candidate.protected_asset || candidate.handwritten_content_write) reasons.push("protected_or_handwritten_target_forbidden");
     if (candidate.dependency_blocked) reasons.push("dependency_unresolved");
+    if (candidate.feature_evidence_verified) reasons.push("feature_evidence_already_verified");
     if (candidateComponentState === "closed" || candidateComponentState === "protected") reasons.push("closure_component_already_closed");
     if (
       funnelFrontier &&

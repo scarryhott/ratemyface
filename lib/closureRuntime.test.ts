@@ -119,6 +119,24 @@ describe("business closure runtime selector", () => {
     assert.ok(round.evaluations.find((item) => item.candidate.id === "protected")?.reasons.includes("protected_or_handwritten_target_forbidden"));
   });
 
+  it("does not reselect a verified feature when another feature keeps its component open", () => {
+    const round = selectClosureRuntimeRound(input({
+      closure_input: {
+        ...input().closure_input,
+        agents: [{ auth_user_linked: true, feature_access: "scoped", last_verified_at: "2026-08-14T00:00:00Z" }]
+      },
+      candidates: [
+        candidate({ id: "verified-account", closure_component: "identity", feature_key: "codex_agent_account", funnel_stage: "account", feature_evidence_verified: true }),
+        candidate({ id: "full-access", closure_component: "identity", feature_key: "full_feature_access", funnel_stage: "account", authority: 2 })
+      ],
+      admitted_authority: 1
+    }));
+    assert.equal(round.mode, "blocked");
+    assert.equal(round.selected, null);
+    assert.ok(round.evaluations.find((item) => item.candidate.id === "verified-account")?.reasons.includes("feature_evidence_already_verified"));
+    assert.ok(round.evaluations.find((item) => item.candidate.id === "full-access")?.reasons.includes("authority_not_admitted"));
+  });
+
   it("does not optimize a later funnel stage before the first measured drop-off", () => {
     const round = selectClosureRuntimeRound(input({
       closure_input: { ...input().closure_input, features: features.map((feature) => feature.feature_key === "feature_monitor_adder" ? { ...feature, evidence_status: "partial" } : feature) },
