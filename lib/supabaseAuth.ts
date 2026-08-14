@@ -10,6 +10,15 @@ function supabaseUrl(): string | null {
   return process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || null;
 }
 
+function supabasePublishableKey(): string | null {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    null
+  );
+}
+
 export function supabaseOAuthConfigured(): boolean {
   return Boolean(supabaseUrl());
 }
@@ -31,14 +40,18 @@ export async function currentOAuthUser(request: NextRequest): Promise<Authentica
   }
 
   const url = supabaseUrl();
-  if (!url) return null;
-  const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/oauth/userinfo`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const key = supabasePublishableKey();
+  if (!url || !key) return null;
+  const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${token}`
+    },
     cache: "no-store"
   });
   if (!response.ok) return null;
   const data = await response.json().catch(() => ({}));
-  const id = typeof data?.sub === "string" ? data.sub : "";
+  const id = typeof data?.id === "string" ? data.id : "";
   if (!id) return null;
   return { id, email: typeof data?.email === "string" ? data.email : undefined };
 }
