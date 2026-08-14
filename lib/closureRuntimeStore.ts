@@ -1,4 +1,5 @@
 import { db, isUndefinedTableError } from "./db";
+import { syncCodexMcpIdentity } from "./codexAgentIdentity";
 import { existingPublicTables } from "./operatorOpsRead";
 import {
   CONTROL_TABLES,
@@ -101,6 +102,9 @@ async function readPreviousCursor(sql: any, hasContext: boolean) {
 export async function computeClosureRuntimeRound(options: { persist?: boolean } = {}): Promise<ClosureRuntimeRound> {
   const sql = db();
   const existing = await existingPublicTables(sql, [...CONTROL_TABLES, "rmf_agent_context"]);
+  if (options.persist && CONTROL_TABLES.every((table) => existing.has(table))) {
+    await syncCodexMcpIdentity(sql);
+  }
   const control = CONTROL_TABLES.every((table) => existing.has(table))
     ? await readUnifiedControlPlane(sql, existing)
     : unavailableUnifiedControlPlane("control_plane_schema_not_applied");

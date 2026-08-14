@@ -11,7 +11,7 @@
     "test:account-learning": "node --experimental-strip-types --test lib/accountLearningShape.test.ts lib/accountLearningPipeline.test.ts lib/appearanceAgent.test.ts lib/compareJobs.test.ts lib/compareVision.test.ts lib/customerCreditPortal.test.ts lib/db.test.ts lib/featureDashboard.test.ts lib/gptConversion.test.ts lib/agentFeatureBacklog.test.ts lib/operatorQueue.test.ts lib/operatorWorker.test.ts lib/personalExperimentEvidence.test.ts lib/personalExperiments.test.ts lib/personalIntelligenceEvidence.test.ts lib/personalIntelligenceSuite.test.ts lib/providerConnections.test.ts",
     "test:rls": "node --experimental-strip-types --test lib/rmfPersonalBillingRls.test.ts lib/rmfCompareRls.test.ts lib/rmfProviderConnectionsRls.test.ts lib/rmfAppearanceAgentRls.test.ts lib/rmfPersonalExperimentsRls.test.ts lib/rmfPersonalIntelligenceRls.test.ts",
     "test:control-plane": "node --experimental-strip-types --test lib/unifiedControlPlane.test.ts",
-    "test:closure": "node --experimental-strip-types --test lib/businessClosure.test.ts lib/closureRuntime.test.ts",
+    "test:closure": "node --experimental-strip-types --test lib/codexAgentIdentity.test.ts lib/businessClosure.test.ts lib/closureRuntime.test.ts",
     "test": "npm run verify:protected && npm run test:account-learning && npm run test:rls && npm run test:control-plane && npm run test:closure"
   },
   "dependencies": {
