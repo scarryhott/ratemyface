@@ -12,7 +12,9 @@ export const CODEX_MCP_ENTITLEMENTS = [
   "personal_product_learning",
   "personal_social_outcomes",
   "personal_reference_comparisons",
-  "personal_agent_status"
+  "personal_agent_status",
+  "get_scoped_credit_entitlements",
+  "create_scoped_credit_checkout_session"
 ] as const;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
