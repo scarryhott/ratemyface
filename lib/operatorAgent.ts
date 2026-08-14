@@ -20,6 +20,7 @@ import {
   readFeatureReceipts,
   receiptFromTool,
   recordStrategyFromRun,
+  snapshotBusinessMetrics,
   type BusinessMetricsSnapshot
 } from "./agentBusinessLoop";
 import {
@@ -34,7 +35,10 @@ import {
   WORKER_HARNESS
 } from "./operatorWorkerResult";
 import { isGithubToolTimeoutError } from "./operatorGithubTimeout";
-import { recordUnifiedFeatureReceipt } from "./unifiedControlPlane";
+import {
+  recordUnifiedFeatureReceipt,
+  recordUnifiedMetricSnapshots
+} from "./unifiedControlPlane";
 import {
   executeOperatorTool,
   getOperatorToolRegistry,
@@ -556,13 +560,20 @@ export async function runOneSignal() {
     signal.payload && typeof signal.payload === "object"
       ? (signal.payload as Record<string, unknown>)
       : {};
-  const metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
+  let metricsBefore = (payload.metrics_snapshot || null) as BusinessMetricsSnapshot | null;
   const kind = String(signal.kind);
   const signalId = Number(signal.id);
   const signalSource = String(signal.source);
   const isBuildCycle = kind === "business_improve" || kind === "heartbeat";
   let managerial: ManagerialDecision | null = null;
   if (isBuildCycle) {
+    try {
+      metricsBefore = await snapshotBusinessMetrics();
+      payload.metrics_snapshot = metricsBefore;
+      payload.unified_metric_snapshot_count = await recordUnifiedMetricSnapshots(metricsBefore, runId);
+    } catch (error) {
+      payload.unified_metric_snapshot_error = errorMessage(error);
+    }
     const receipts = await readFeatureReceipts();
     managerial = decideManagerialAction({
       evidence: inspectRepoEvidence(),

@@ -6,8 +6,10 @@ import {
   PROTECTED_GPT_KEY,
   normalizeFeatureRegistration,
   normalizeGptFactoryRequest,
+  projectBusinessMetricSnapshots,
   summarizeUnifiedFeatures,
   unavailableUnifiedControlPlane,
+  type BusinessMetricProjectionInput,
   type FeatureAccess,
   type FeatureCategory,
   type FeatureLifecycle,
@@ -27,6 +29,7 @@ export {
   unavailableUnifiedControlPlane
 } from "./unifiedControlPlaneShape";
 export type {
+  BusinessMetricProjectionInput,
   EvidenceStatus,
   FeatureAccess,
   FeatureCategory,
@@ -232,6 +235,58 @@ export async function queueGptFactoryJob(input: Record<string, unknown>, actor: 
     `;
     return rows[0];
   });
+}
+
+export async function recordUnifiedMetricSnapshots(
+  snapshot: BusinessMetricProjectionInput,
+  runId: number
+): Promise<number> {
+  const metrics = projectBusinessMetricSnapshots(snapshot);
+  if (!metrics.length) return 0;
+  const sourceRef = `operator_run:${runId}`;
+  const observedAt = Number.isFinite(Date.parse(snapshot.captured_at))
+    ? snapshot.captured_at
+    : new Date().toISOString();
+  const sql = db();
+
+  try {
+    return await sql.begin(async (tx) => {
+      const existing = await tx`
+        select 1 from rmf_control_metric_snapshots
+        where source_ref = ${sourceRef}
+        limit 1
+      `;
+      if (existing.length) return 0;
+
+      for (const metric of metrics) {
+        await tx`
+          insert into rmf_control_metric_snapshots(
+            source, metric_key, numeric_value, unit, observed_at, source_ref, dimensions
+          ) values(
+            ${metric.source}, ${metric.metric_key}, ${metric.numeric_value},
+            ${metric.unit}, ${observedAt}, ${sourceRef},
+            ${tx.json({ collection: "operator_business_snapshot" } as any)}
+          )
+        `;
+      }
+
+      await tx`
+        insert into rmf_control_feature_evidence(
+          feature_key, evidence_type, provider, observed_state, passed,
+          run_id, external_ref, payload, observed_at
+        ) values(
+          'monetary_intelligence', 'provider', 'database', 'measuring', true,
+          ${runId}, ${sourceRef},
+          ${tx.json({ metric_count: metrics.length, metric_keys: metrics.map((metric) => `${metric.source}:${metric.metric_key}`) } as any)},
+          ${observedAt}
+        )
+      `;
+      return metrics.length;
+    });
+  } catch (error) {
+    if (isUndefinedTableError(error)) return 0;
+    throw error;
+  }
 }
 
 function canonicalReceiptFeatureKey(value: unknown): string | null {
