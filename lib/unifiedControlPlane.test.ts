@@ -11,6 +11,7 @@ import {
   UNIFIED_FEATURE_SEEDS,
   normalizeFeatureRegistration,
   normalizeGptFactoryRequest,
+  projectBusinessMetricSnapshots,
   unavailableUnifiedControlPlane
 } from "./unifiedControlPlaneShape.ts";
 
@@ -125,5 +126,35 @@ describe("control-plane migration security", () => {
     assert.match(sql, /'human_only'/);
     assert.match(sql, /factory_enabled[\s\S]*false/);
     assert.equal(PROTECTED_GPT_KEY, "rate_my_face");
+  });
+});
+
+describe("unified monetary snapshots", () => {
+  it("projects observed counters without inventing revenue or cost", () => {
+    const metrics = projectBusinessMetricSnapshots({
+      captured_at: "2026-08-14T12:00:00.000Z",
+      auth_users: 1,
+      oauth_users: null,
+      personal_profiles: 1,
+      interactions: 2,
+      personal_recommendations: 2,
+      credit_balance_total: 92,
+      lifetime_purchased: 0,
+      lifetime_spent: 8,
+      stripe_events: 0,
+      agent_runs_7d: 4,
+      agent_signals_queued: 0,
+      pending_approvals: 1,
+      credits_per_pack: 100,
+      signup_credits: 100
+    });
+
+    assert.equal(metrics.some((metric) => metric.source === "stripe" && metric.numeric_value === 0), true);
+    assert.equal(metrics.some((metric) => metric.metric_key === "oauth.users"), false);
+    assert.equal(metrics.some((metric) => /revenue|cost|mrr|usd/i.test(metric.metric_key)), false);
+    assert.deepEqual(
+      metrics.find((metric) => metric.metric_key === "credits.lifetime_purchased"),
+      { source: "product", metric_key: "credits.lifetime_purchased", numeric_value: 0, unit: "credits" }
+    );
   });
 });
