@@ -7,6 +7,12 @@ export function oauthClientSecret(): string {
   return (process.env.RMF_OAUTH_CLIENT_SECRET || "").trim();
 }
 
+export type OAuthClient = {
+  clientId: string;
+  clientSecret: string;
+  redirectUris: string[];
+};
+
 export function allowedRedirectUris(): string[] {
   return (process.env.CHATGPT_OAUTH_REDIRECT_URI || "")
     .split(/[\n,]/)
@@ -16,6 +22,42 @@ export function allowedRedirectUris(): string[] {
 
 export function allowedRedirectUri(): string {
   return allowedRedirectUris()[0] || "";
+}
+
+/** Additional GPT clients are additive; the original environment client remains the fallback. */
+export function configuredOAuthClients(env: NodeJS.ProcessEnv = process.env): OAuthClient[] {
+  const fallback: OAuthClient = {
+    clientId: (env.RMF_OAUTH_CLIENT_ID || "ratemyface-chatgpt").trim(),
+    clientSecret: (env.RMF_OAUTH_CLIENT_SECRET || "").trim(),
+    redirectUris: (env.CHATGPT_OAUTH_REDIRECT_URI || "")
+      .split(/[\n,]/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+  };
+  const raw = (env.RMF_OAUTH_CLIENTS || "").trim();
+  if (!raw) return [fallback];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [fallback];
+    const additional = parsed.flatMap((item): OAuthClient[] => {
+      if (!item || typeof item !== "object") return [];
+      const clientId = typeof item.client_id === "string" ? item.client_id.trim() : "";
+      const clientSecret = typeof item.client_secret === "string" ? item.client_secret.trim() : "";
+      const redirectValues: unknown[] = Array.isArray(item.redirect_uris) ? item.redirect_uris : [];
+      const redirectUris = redirectValues
+        .filter((uri): uri is string => typeof uri === "string")
+        .map((uri) => uri.trim())
+        .filter(Boolean);
+      return clientId && clientSecret && redirectUris.length ? [{ clientId, clientSecret, redirectUris }] : [];
+    });
+    return [fallback, ...additional];
+  } catch {
+    return [fallback];
+  }
+}
+
+export function oauthClient(clientId: string, env: NodeJS.ProcessEnv = process.env): OAuthClient | null {
+  return configuredOAuthClients(env).find((client) => client.clientId === clientId.trim()) || null;
 }
 
 let oauthSchemaReady: Promise<void> | null = null;
@@ -58,20 +100,16 @@ export function randomToken(bytes = 32): string {
 }
 
 export function validClient(clientId: string, redirectUri: string): boolean {
-  const redirects = allowedRedirectUris();
-  return Boolean(
-    redirects.length &&
-    clientId.trim() === OAUTH_CLIENT_ID &&
-    redirects.includes(redirectUri.trim())
-  );
+  const client = oauthClient(clientId);
+  return Boolean(client?.redirectUris.includes(redirectUri.trim()));
 }
 
 export function oauthClientValidation(clientId: string, redirectUri: string) {
-  const redirects = allowedRedirectUris();
+  const client = oauthClient(clientId);
   return {
-    client_id_match: clientId.trim() === OAUTH_CLIENT_ID,
-    redirect_uri_match: redirects.includes(redirectUri.trim()),
-    redirect_uri_configured: redirects.length > 0,
+    client_id_match: Boolean(client),
+    redirect_uri_match: Boolean(client?.redirectUris.includes(redirectUri.trim())),
+    redirect_uri_configured: Boolean(client?.redirectUris.length),
     received_client_id: clientId,
     received_redirect_uri: redirectUri
   };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { basicClientCredentials, exchangeAuthorizationCode, oauthClientSecret, refreshAccessToken, OAUTH_CLIENT_ID } from "../../../lib/oauthBridge";
+import { basicClientCredentials, exchangeAuthorizationCode, oauthClient, refreshAccessToken } from "../../../lib/oauthBridge";
 import { ensureSignupCreditGrant } from "../../../lib/stripeBilling";
 
 function tokenError(error: string, description: string, status = 400) {
@@ -8,7 +8,8 @@ function tokenError(error: string, description: string, status = 400) {
 
 export async function POST(request: NextRequest) {
   const creds = basicClientCredentials(request.headers.get("authorization"));
-  if (!creds || creds.clientId !== OAUTH_CLIENT_ID || !oauthClientSecret() || creds.clientSecret !== oauthClientSecret()) {
+  const client = creds ? oauthClient(creds.clientId) : null;
+  if (!creds || !client || creds.clientSecret !== client.clientSecret) {
     return tokenError("invalid_client", "Client authentication failed.", 401);
   }
 
