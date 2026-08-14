@@ -89,7 +89,8 @@ function candidateFromFeature(feature: UnifiedFeatureView, browserConfigured: bo
     requires_owner_session: requiresOwnerSession,
     dependency_blocked:
       (requiresOwnerSession && !browserConfigured) ||
-      feature.feature_key === "affiliate_attribution"
+      feature.feature_key === "affiliate_attribution",
+    feature_evidence_verified: feature.evidence_status === "verified"
   };
 }
 
