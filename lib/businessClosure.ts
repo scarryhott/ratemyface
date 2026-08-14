@@ -62,7 +62,7 @@ export function evaluateBusinessClosure(input: ClosureInput): BusinessClosure {
     return !feature || feature.lifecycle_status !== "active" || feature.access_status !== "available" || feature.evidence_status !== "verified";
   });
   const identityLinked = input.agents.some(
-    (agent) => agent.auth_user_linked && agent.feature_access === "available" && Boolean(agent.last_verified_at)
+    (agent) => agent.auth_user_linked && agent.feature_access === "full_authorized" && Boolean(agent.last_verified_at)
   );
   const protectedGpt = input.gpt_factory.protected_gpt;
   const protectedClosed = protectedGpt.creator_mode === "human_only" && !protectedGpt.factory_enabled && Boolean(protectedGpt.instruction_hash);
