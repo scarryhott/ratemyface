@@ -34,6 +34,7 @@ import {
   WORKER_HARNESS
 } from "./operatorWorkerResult";
 import { isGithubToolTimeoutError } from "./operatorGithubTimeout";
+import { recordUnifiedFeatureReceipt } from "./unifiedControlPlane";
 import {
   executeOperatorTool,
   getOperatorToolRegistry,
@@ -424,7 +425,25 @@ async function storeReceipt(runId: number, receipt: OperatorToolReceipt) {
       ${receipt.rollback_ref},${receipt.external_ref},${sql.json(receipt.detail as any)}
     ) returning id,created_at
   `;
-  return rows[0];
+  const row = rows[0] as { id: number; created_at: string };
+  let controlPlaneRecorded = false;
+  let controlPlaneError: string | null = null;
+  try {
+    controlPlaneRecorded = await recordUnifiedFeatureReceipt(
+      runId,
+      Number(row.id),
+      receipt
+    );
+  } catch (error) {
+    // The primary receipt remains durable even if the optional control-plane
+    // projection is unavailable. Surface the projection error in the ledger.
+    controlPlaneError = errorMessage(error);
+  }
+  return {
+    ...row,
+    control_plane_recorded: controlPlaneRecorded,
+    control_plane_error: controlPlaneError
+  };
 }
 
 function fallbackProbePlan(): OperatorModelPlan {
@@ -805,7 +824,9 @@ export async function runOneSignal() {
       expected: receipt.expected,
       observed: receipt.observed,
       rollback_ref: receipt.rollback_ref,
-      external_ref: receipt.external_ref
+      external_ref: receipt.external_ref,
+      control_plane_recorded: receiptRow.control_plane_recorded,
+      control_plane_error: receiptRow.control_plane_error
     }, receipt.tool, receipt.verified);
 
     const cycle = managerial

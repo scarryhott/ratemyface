@@ -16,6 +16,7 @@ import {
 } from "./ControlSections";
 import { FounderCreditPanel } from "./FounderCreditPanel";
 import { AgentConsoleSection } from "./AgentConsole";
+import { UnifiedControlSection } from "./UnifiedControlSection";
 import {
   pill,
   button,
@@ -48,6 +49,7 @@ type DashboardPayload = {
   social_providers?: any;
   revenue_dashboard?: any;
   operations_health?: any;
+  unified_control?: any;
   ops?: any;
 };
 
@@ -253,6 +255,8 @@ export default function OperatorDashboardV2() {
           </p>
         </section>
       )}
+
+      {data?.unified_control && <UnifiedControlSection data={data.unified_control} />}
 
       {/* Secondary: collapsed business metrics */}
       <section className="card" style={{ marginTop: 28 }}>

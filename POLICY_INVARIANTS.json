@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "project": "unified-rate-my-face-business",
+  "protected_assets": {
+    "rate_my_face_gpt_instructions": {
+      "owner": "Harry Scott",
+      "authoring_policy": "human_only",
+      "agent_read_access": "hash_only_when_needed",
+      "agent_write_access": "denied_forever",
+      "forbidden_operations": [
+        "append",
+        "edit",
+        "expand",
+        "normalize",
+        "paraphrase",
+        "publish",
+        "reconstruct",
+        "reformat",
+        "remove",
+        "replace",
+        "restore",
+        "rewrite",
+        "shorten",
+        "summarize",
+        "synchronize",
+        "translate",
+        "trim"
+      ],
+      "conflict_behavior": "redesign_around_existing_instructions_or_report_blocked",
+      "exception_policy": "none_for_ai_agents",
+      "repository_guards": [
+        {
+          "path": "GPT_INSTRUCTIONS.md",
+          "sha256": "b561dd48b11dfc052601a1ce1ca53aff1961fa74f7e3c8749a5c487931cf47dc"
+        },
+        {
+          "path": "CUSTOM_GPT_INSTRUCTIONS.md",
+          "sha256": "067e81733c1076f8580b2a4c664842f5dce1cc318fabcce0451f3a2903f1d58e"
+        }
+      ]
+    }
+  },
+  "completion_policy": {
+    "activity_is_completion": false,
+    "requires_end_to_end_verification": true,
+    "monetary_work_requires_funnel_evidence": true
+  },
+  "credit_ledgers": [
+    "customer_product_credits",
+    "agent_compute_cost",
+    "infrastructure_cost"
+  ]
+}

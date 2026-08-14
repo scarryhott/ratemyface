@@ -13,6 +13,12 @@ import {
   creditsPerPack,
   signupCredits
 } from "./stripeBilling";
+import {
+  CONTROL_TABLES,
+  readUnifiedControlPlane,
+  unavailableUnifiedControlPlane,
+  type UnifiedControlPlaneView
+} from "./unifiedControlPlane";
 
 function asNumber(value: unknown): number {
   const n = Number(value ?? 0);
@@ -207,6 +213,7 @@ export type DashboardV2 = {
     auth_failures: MetricValue;
     pending_approvals: number;
   };
+  unified_control: UnifiedControlPlaneView;
   /** Full ops payload retained for founder grant panel + legacy compatibility. */
   ops: Awaited<ReturnType<typeof getOperatorOpsRead>>;
 };
@@ -380,6 +387,7 @@ function emptyDashboard(
       auth_failures: unavailable("Auth failure telemetry not persisted yet"),
       pending_approvals: 0
     },
+    unified_control: unavailableUnifiedControlPlane(reason),
     ops
   };
 }
@@ -440,7 +448,8 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
       "rmf_compare_results",
       "rmf_appearance_plans",
       "rmf_appearance_checkins",
-      "rmf_learning_events"
+      "rmf_learning_events",
+      ...CONTROL_TABLES
     ]);
     const hasCredits = existing.has("rmf_credit_accounts");
     const hasLedger = existing.has("rmf_credit_ledger");
@@ -717,6 +726,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
     });
 
     const infra = infrastructureCreditBoundary();
+    const unifiedControl = await readUnifiedControlPlane(tx, existing);
 
     return {
       ok: true,
@@ -922,6 +932,7 @@ export async function getOperatorDashboardV2(): Promise<DashboardV2> {
         auth_failures: unavailable("Auth failure telemetry not persisted yet"),
         pending_approvals: asNumber(ops.counts?.approvals_pending)
       },
+      unified_control: unifiedControl,
       ops
     };
   });
