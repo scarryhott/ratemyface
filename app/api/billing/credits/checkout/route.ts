@@ -31,6 +31,10 @@ export async function POST(request: NextRequest) {
 
   const origin = request.nextUrl.origin;
   const credits = creditsPerPack();
+  const checkoutSource = request.nextUrl.searchParams.get("source") === "web_account"
+    ? "web_account"
+    : "chatgpt_action";
+  const webAccountCheckout = checkoutSource === "web_account";
   const session = await client.checkout.sessions.create({
     mode: "payment",
     customer: customerId,
@@ -39,12 +43,15 @@ export async function POST(request: NextRequest) {
     metadata: {
       rmf_user_id: user.id,
       purchase_type: "credits",
-      credits: String(credits)
+      credits: String(credits),
+      checkout_source: checkoutSource
     },
-    success_url:
-      process.env.STRIPE_SUCCESS_URL ||
-      `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: process.env.STRIPE_CANCEL_URL || `${origin}/dashboard?checkout=cancelled`
+    success_url: webAccountCheckout
+      ? `${origin}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+      : process.env.STRIPE_SUCCESS_URL || `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: webAccountCheckout
+      ? `${origin}/account?checkout=cancelled`
+      : process.env.STRIPE_CANCEL_URL || `${origin}/dashboard?checkout=cancelled`
   });
 
   if (!session.url) {
@@ -55,6 +62,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     checkout_url: session.url,
     session_id: session.id,
-    credits
+    credits,
+    checkout_source: checkoutSource
   });
 }
