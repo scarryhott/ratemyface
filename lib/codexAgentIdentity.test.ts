@@ -24,8 +24,10 @@ describe("Codex MCP identity provisioning", () => {
 
   it("records only tools deployed on the current MCP surface", () => {
     const entitlements: readonly string[] = CODEX_MCP_ENTITLEMENTS;
-    assert.equal(CODEX_MCP_ENTITLEMENTS.length, 14);
+    assert.equal(CODEX_MCP_ENTITLEMENTS.length, 16);
     assert.ok(entitlements.includes("personal_agent_status"));
+    assert.ok(entitlements.includes("get_scoped_credit_entitlements"));
+    assert.ok(entitlements.includes("create_scoped_credit_checkout_session"));
     assert.ok(!entitlements.includes("compare_me_to_me"));
     assert.ok(!entitlements.includes("credit_checkout"));
   });
